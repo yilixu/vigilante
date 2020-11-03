@@ -1,13 +1,37 @@
 Package: vigilante
-Title: What the Package Does (One Line, Title Case)
+Title: Visualizing Integrated Genomics In Linked And Nested Translational Elaboration
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Yili",
+           family = "Xu",
            role = c("aut", "cre"),
-           email = "first.last@example.com",
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: What license it uses
+           email = "yilixu@usc.edu")
+Description: Full name of the package should be vigilante & knights (Visualizing Integrated Genomics In Linked And Nested Translational Elaboration & Knowing Numbers In Genomic Hypothesis Through Statistics). The goal of vigilante is to facilitate data analysis and visualization with next-generation sequencing (NGS) researches. Also, vigilante works in a highly self-contained pipeline style, and is designed to be user-friendly even for researchers who don't have much experience in programming. 
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 6.1.1
+Imports: 
+    circlize,
+    ComplexHeatmap,
+    tools,
+    plyr,
+    dplyr,
+    tidyr,
+    stringr,
+    png,
+    qvalue,
+    reshape2,
+    ggpubr,
+    ggplot2,
+    xCell,
+    maftools,
+    TCGAbiolinks,
+    RnaSeqSampleSize,
+    SRAdb,
+    DESeq2,
+    EnhancedVolcano,
+    ggrepel,
+    data.table,
+    glue,
+    utils

@@ -399,21 +399,20 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #' @return list, user needs to run the function with assigning the return value to a specific variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
 #'
 #' @examples
-#' # single study of schwannoma
 #' \dontrun{
+#' # single study of schwannoma
 #' globalSettings_returnList = v_globalSettings(studyID = "KSCWUSCRF",
 #' studyID_regex = "[[:upper:]]{9}", studyID_altered = FALSE, speciesID =
 #' "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
 #' createOutputFolders = TRUE, prepareVdata = TRUE)
-#' }
 #'
 #' # combined study of prostate cancer
-#' \dontrun{
 #' globalSettings_returnList = v_globalSettings(studyID = "KPROCOMBI",
 #' studyID_regex = "[[:upper:]]{9}", studyID_altered = TRUE, speciesID =
 #' "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
 #' createOutputFolders = TRUE, prepareVdata = TRUE)
 #' }
+#'
 #' @import utils
 #'
 #' @export

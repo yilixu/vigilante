@@ -49,19 +49,18 @@ Another very important thing about vigilante is the "groupInfo.csv" file. This f
 For example, if samples are divided into training, validation and testing groups, the "Group" column should be filled with "Training", "Validation" and "Testing" accordingly. Similarly, if additional clinical information are available, user can specify them in the "CliFea" columns. Here "CliFea" is only a placeholder name, and user should change the column name to reflect that clinical feature (e.g. change it to "Race" column and fill in race information like "White", "Black or African American", "Asian" etc.; "Gleason Score" and fill in Gleason score values). Also, "CliFea" columns are not limited to two. User can add more columns to the right following the above instruction.
 }
 \examples{
-# single study of schwannoma
 \dontrun{
+# single study of schwannoma
 globalSettings_returnList = v_globalSettings(studyID = "KSCWUSCRF",
 studyID_regex = "[[:upper:]]{9}", studyID_altered = FALSE, speciesID =
 "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
 createOutputFolders = TRUE, prepareVdata = TRUE)
-}
 
 # combined study of prostate cancer
-\dontrun{
 globalSettings_returnList = v_globalSettings(studyID = "KPROCOMBI",
 studyID_regex = "[[:upper:]]{9}", studyID_altered = TRUE, speciesID =
 "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
 createOutputFolders = TRUE, prepareVdata = TRUE)
 }
+
 }

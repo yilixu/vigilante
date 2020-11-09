@@ -480,6 +480,7 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
   temp_globalSettings_returnList = c(temp_globalSettings_returnList, prepareVdata_returnList)
 
   # end of v_globalSettings function
+  print("v_globalSettings run completed, return value saved to the global environment in **globalSettings_returnList**")
   return(temp_globalSettings_returnList)
 }
 

@@ -26,7 +26,7 @@ v_globalSettings(studyID, studyID_regex, studyID_altered = FALSE,
 \item{prepareVdata}{logical, whether to allow vigilante prepare all input data files in the working directory. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc. If TRUE, user will be asked to backup input data files before continuing; if FALSE, vigilante will stop the run and no input data files will be affected.}
 }
 \value{
-list, user needs to run the function with assigning the return value to a specific variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
+list, because R CMD check discourages assignments to the global environment within functions, user needs to run the function with explicitly assigning the return value to a global variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
 }
 \description{
 vigilante is designed to work in a highly self-contained pipeline style. To ensure that, there are several global settings need to be specified by the user. Also, in order to properly perform downstream analyses, vigilante needs to prepare all input data files in the working directory before continuing. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc.

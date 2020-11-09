@@ -1,11 +1,9 @@
 Package: vigilante
 Title: Visualizing Integrated Genomics In Linked And Nested Translational Elaboration
-Version: 0.0.0.9000
-Authors@R: 
-    person(given = "Yili",
-           family = "Xu",
-           role = c("aut", "cre"),
-           email = "yilixu@usc.edu")
+Version: 0.0.0.9001
+Authors@R: c(
+    person("Yili", "Xu", email = "yilixu@usc.edu", role = c("aut", "cre")),
+    person("Zarko", "Manojlovic", email = "zmanojlo@usc.edu", role = c("ctb")))
 Description: Full name of the package should be vigilante & knights (Visualizing Integrated Genomics In Linked And Nested Translational Elaboration & Knowing Numbers In Genomic Hypothesis Through Statistics). The goal of vigilante is to facilitate data analysis and visualization with next-generation sequencing (NGS) researches. Also, vigilante works in a highly self-contained pipeline style, and is designed to be user-friendly even for researchers who don't have much experience in programming. 
 URL: https://github.com/yilixu/vigilante
 BugReports: https://github.com/yilixu/vigilante/issues

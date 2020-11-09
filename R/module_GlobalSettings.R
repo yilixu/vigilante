@@ -396,7 +396,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #'
 #' For example, if samples are divided into training, validation and testing groups, the "Group" column should be filled with "Training", "Validation" and "Testing" accordingly. Similarly, if additional clinical information are available, user can specify them in the "CliFea" columns. Here "CliFea" is only a placeholder name, and user should change the column name to reflect that clinical feature (e.g. change it to "Race" column and fill in race information like "White", "Black or African American", "Asian" etc.; "Gleason Score" and fill in Gleason score values). Also, "CliFea" columns are not limited to two. User can add more columns to the right following the above instruction.
 #'
-#' @return list, user needs to run the function with assigning the return value to a specific variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
+#' @return list, because R CMD check discourages assignments to the global environment within functions, user needs to run the function with explicitly assigning the return value to a global variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
 #'
 #' @examples
 #' \dontrun{

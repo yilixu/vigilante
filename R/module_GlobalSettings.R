@@ -420,8 +420,8 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 # v_globalSettings function
 v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE, createOutputFolders = FALSE, prepareVdata = FALSE) {
 
-  # ask user to make sure v_globalSettings function return value is assigned to the specific variable named "globalSettings_returnList"
-  status_returnValue = menu(choices = c("Yes", "No"), title = "\nIs v_globalSettings function return value assigned to the specific variable named 'globalSettings_returnList'?")
+  # ask user to make sure v_globalSettings function return value is assigned to the global variable named "globalSettings_returnList"
+  status_returnValue = menu(choices = c("Yes", "No"), title = "\nIs v_globalSettings function return value assigned to the global variable named 'globalSettings_returnList'?")
   if (status_returnValue == 1) {
     print("Function return value is properly assigned, now continue to the next step")
   } else if (status_returnValue == 2) {

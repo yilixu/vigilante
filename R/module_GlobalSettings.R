@@ -359,6 +359,9 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   # add ENSEMBL reference to temp_prepareVdata_returnList
   temp_prepareVdata_returnList = c(temp_prepareVdata_returnList, GRCh38_ref, GRCh37_ref, GRCm38_ref)
 
+  # remove variables already added to temp_prepareVdata_returnList
+  rm(list = names(temp_prepareVdata_returnList))
+
   # end of v_prepareVdata function
   print("Data preparation for vigilante completed")
   return(temp_prepareVdata_returnList)
@@ -478,6 +481,9 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
 
   # add variables from prepareVdata to global settings
   temp_globalSettings_returnList = c(temp_globalSettings_returnList, prepareVdata_returnList)
+
+  # remove variables already added to temp_globalSettings_returnList
+  suppressWarnings(rm(list = names(temp_globalSettings_returnList)))
 
   # end of v_globalSettings function
   print("v_globalSettings run completed, return value saved to the global environment in **globalSettings_returnList**")

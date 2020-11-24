@@ -4,9 +4,17 @@
 \alias{v_globalSettings}
 \title{Global settings for vigilante}
 \usage{
-v_globalSettings(studyID, studyID_regex, studyID_altered = FALSE,
-  speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE,
-  createOutputFolders = FALSE, prepareVdata = FALSE)
+v_globalSettings(
+  studyID,
+  studyID_regex,
+  studyID_altered = FALSE,
+  speciesID = "hg38",
+  fileNum,
+  fileDNA_mafNum,
+  clinicalFeature = FALSE,
+  createOutputFolders = FALSE,
+  prepareVdata = FALSE
+)
 }
 \arguments{
 \item{studyID}{character, study or project name, will be used in multiple naming situations (such as on the plot, or in the output file names), it is recommended to be concise and meaningful (e.g. "ProstateCancer", or "PCa" for short; "TripleNegativeBreastCancer", or "TNBC" for short), also avoid using special characters.}

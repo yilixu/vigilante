@@ -4,8 +4,15 @@
 \alias{v_prepareVdata}
 \title{Prepare data for vigilante analyses}
 \usage{
-v_prepareVdata(studyID, studyID_regex, studyID_altered, speciesID, fileNum,
-  fileDNA_mafNum, clinicalFeature)
+v_prepareVdata(
+  studyID,
+  studyID_regex,
+  studyID_altered,
+  speciesID,
+  fileNum,
+  fileDNA_mafNum,
+  clinicalFeature
+)
 }
 \description{
 (Internal) In order to properly perform downstream analyses, vigilante needs to prepare all input data files in the working directory before continuing. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc.

@@ -36,7 +36,7 @@ devtools::install_github("yilixu/vigilante", ref = "main")
 
 
 
-#### Reference:
+#### References:
 * Love MI, Huber W, Anders S (2014). “Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2.” Genome Biology, 15, 550.
 * Aran, Hu and Butte, xCell: digitally portraying the tissue cellular heterogeneity landscape. Genome Biology (2017) 18:220
 * Díaz-Gay, M., Vila-Casadesús, M., Franch-Expósito, S. et al. Mutational Signatures in Cancer (MuSiCa): a web application to implement mutational signatures analysis in cancer samples. BMC Bioinformatics 19, 224 (2018).

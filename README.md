@@ -25,7 +25,7 @@ A Quick Glance at ***vigilante & knights***
 
 ![](./man/figures/VIGILANTE_Feature_Summary_4K_v2.png)
 
-#### Reference:
+#### References:
 
 -   Love MI, Huber W, Anders S (2014). “Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2.” Genome Biology, 15, 550.
 -   Aran, Hu and Butte, xCell: digitally portraying the tissue cellular heterogeneity landscape. Genome Biology (2017) 18:220

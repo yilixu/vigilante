@@ -1,10 +1,10 @@
 Package: vigilante
-Title: Visualizing Integrated Genomics In Linked And Nested Translational Elaboration
+Title: Visualizing Integrated Genomics in Linked and Nested Translational Elaboration
 Version: 0.0.0.9002
 Authors@R: c(
     person("Yili", "Xu", email = "yilixu@usc.edu", role = c("aut", "cre")),
-    person("Zarko", "Manojlovic", email = "zmanojlo@usc.edu", role = c("ctb")))
-Description: Full name of the package should be vigilante & knights (Visualizing Integrated Genomics In Linked And Nested Translational Elaboration & Knowing Numbers In Genomic Hypothesis Through Statistics). The goal of vigilante is to facilitate data analysis and visualization with next-generation sequencing (NGS) researches. Also, vigilante works in a highly self-contained pipeline style, and is designed to be user-friendly even for researchers who don't have much experience in programming. 
+    person("Zarko", "Manojlovic", email = "zmanojlo@usc.edu", role = c("aut")))
+Description: Full name of the package should be vigilante & knights (Visualizing Integrated Genomics in Linked and Nested Translational Elaboration & Knowing Numbers in Genomic Hypothesis Through Statistics). The goal of vigilante is to facilitate data analysis and visualization in high-throughput next-generation sequencing (HT-NGS) researches by empowering researchers to perform complex, cutting-edge informatics-based analyses on their whole genome/exosome sequencing (WGS/WES) and RNA-seq data in an interactive open-source environment with statistical modules built to assess biological events. Also, vigilante works in a highly self-contained pipeline style, and is designed to be user-friendly even for non-informatics researchers who don't have much experience in programming.
 URL: https://github.com/yilixu/vigilante
 BugReports: https://github.com/yilixu/vigilante/issues
 License: MIT + file LICENSE

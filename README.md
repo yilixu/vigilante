@@ -27,6 +27,7 @@ A Quick Glance at ***vigilante & knights***
 
 #### References:
 
--   Love MI, Huber W, Anders S (2014). “Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2.” Genome Biology, 15, 550.
--   Aran, Hu and Butte, xCell: digitally portraying the tissue cellular heterogeneity landscape. Genome Biology (2017) 18:220
+-   Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol. 2014;15(12):550.
+-   Krämer A, Green J, Pollard J Jr, Tugendreich S. Causal analysis approaches in Ingenuity Pathway Analysis. Bioinformatics. 2014 Feb 15;30(4):523-30.
+-   Aran D, Hu Z, Butte AJ. xCell: digitally portraying the tissue cellular heterogeneity landscape. Genome Biol. 2017 Nov 15;18(1):220.
 -   Díaz-Gay, M., Vila-Casadesús, M., Franch-Expósito, S. et al. Mutational Signatures in Cancer (MuSiCa): a web application to implement mutational signatures analysis in cancer samples. BMC Bioinformatics 19, 224 (2018).

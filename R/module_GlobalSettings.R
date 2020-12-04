@@ -308,8 +308,8 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   GRCm38_ref = NULL
 
   if (speciesID == "hg38") {
-    GRCh38G = read.delim("./_ensembl_reference/GRCh38G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End"))
-    GRCh38G[, 3] = paste0("chr", GRCh38G[, 3])
+    GRCh38G = read.delim("./_ensembl_reference/GRCh38G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End", "Source", "Type"))
+    GRCh38G = GRCh38G[, 1:5]
     chr_len_GRCh38G.p13 = read.csv("./_ensembl_reference/chr_len_GRCh38G.p13.csv", stringsAsFactors = FALSE)
     chr_len_H = chr_len_GRCh38G.p13[, 2]
     names(chr_len_H) = chr_len_GRCh38G.p13[, 1]

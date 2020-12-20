@@ -7,7 +7,7 @@
 
 <!-- badges: start -->
 <!-- badges: end -->
-The goal of ***vigilante & knights*** is to facilitate data analysis and visualization in high-throughput next-generation sequencing (HT-NGS) researches by empowering researchers to perform complex, cutting-edge informatics-based analyses on their whole genome/exosome sequencing (WGS/WES) and RNA-seq data in an interactive open-source environment with statistical modules built to assess biological events. Also, vigilante works in a highly self-contained pipeline style, and is designed to be user-friendly even for non-informatics researchers who don't have much experience in programming.
+The goal of ***vigilante & knights*** is to facilitate data analysis and visualization in high-throughput next-generation sequencing (HT-NGS) researches by empowering researchers to perform complex, cutting-edge informatics-based analyses on their whole genome/exosome sequencing (WGS/WES) and RNA-seq data in an interactive open-source environment with statistical modules built to assess biological events. Also, ***vigilante & knights*** works in a highly self-contained pipeline style, and is designed to be user-friendly even for non-informatics researchers who don't have much experience in programming.
 
 Installation
 ------------

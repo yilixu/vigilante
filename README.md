@@ -18,7 +18,7 @@ Currently ***vigilante & knights*** is under reconfiguration for the official R 
 devtools::install_github("yilixu/vigilante", ref = "main")
 ```
 
-In addition, due to the requirement of CRAN that general packages should not exceed 5MB, the **s**upplemental **w**orkbook **o**r **r**eference **d**atasets required by ***vigilante & knights*** have been extracted and put in the standalone package ***vigilante.knights.sword***. Please check [vigilante.knights.sword](https://github.com/yilixu/vigilante.knights.sword) for more information.
+In addition, due to the requirement of CRAN that general packages should not exceed 5MB, the ***S***upplemental ***W***orkbook ***O***r ***R***eference ***D***atasets required by ***vigilante & knights*** have been extracted and put in the standalone package ***vigilante.knights.sword***. Please check [vigilante.knights.sword](https://github.com/yilixu/vigilante.knights.sword) for more information.
 
 The development version of ***vigilante.knights.sword*** can be installed following the in-house prompts, or manually from GitHub with:
 

@@ -39,6 +39,7 @@ Imports:
     magrittr,
     grDevices,
     graphics,
-    grid
+    grid,
+    devtools
 Depends: 
     R (>= 2.10)

@@ -424,7 +424,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE, createOutputFolders = FALSE, prepareVdata = FALSE) {
 
   # ask user to make sure "vigilante.knights.sword" package is already installed
-  status_sword = menu(choices = c("Yes", "No"), title = "\nDue to the requirement of CRAN that general packages should not exceed 5MB, the supplemental workbook or reference datasets (sword) required by vigilante & knights have been extracted and put in the standalone package vigilante.knights.sword. Please check https://github.com/yilixu/vigilante.knights.sword for more information. vigilante & knights will need 'sword' to perform downstream analysis. Is 'vigilante.knights.sword' package already installed?")
+  status_sword = menu(choices = c("Yes", "No"), title = "\nDue to the requirement of CRAN that general packages should not exceed 5MB, the supplemental workbook or reference datasets (sword) required by vigilante & knights have been extracted and put in the separate package vigilante.knights.sword. Please check https://github.com/yilixu/vigilante.knights.sword for more information. vigilante & knights will need 'sword' to perform downstream analysis. Is 'vigilante.knights.sword' package already installed?")
   if (status_sword == 1) {
     print("Checking 'vigilante.knights.sword' package status")
     status_sword_check = "vigilante.knights.sword" %in% utils::installed.packages()

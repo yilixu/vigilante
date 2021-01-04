@@ -186,7 +186,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_baf) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_baf)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy_exo.baf.tsv", paste0(studyID, "_", assayID[i], "_dummy_exo.baf.tsv"))
+          file.copy(system.file("extdata", "template_dummy_exo.baf.tsv", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy_exo.baf.tsv"))
         }
       }
       rm(i)
@@ -197,7 +197,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_cna) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_cna)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy_exo.cna.tsv", paste0(studyID, "_", assayID[i], "_dummy_exo.cna.tsv"))
+          file.copy(system.file("extdata", "template_dummy_exo.cna.tsv", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy_exo.cna.tsv"))
         }
       }
       rm(i)
@@ -208,17 +208,17 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if ((fileDNA_mafNum == 1 & length(file_maf) > 1)) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_maf)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy.MuTect.seurat.strelka.maf", paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.maf"))
+          file.copy(system.file("extdata", "template_dummy.MuTect.seurat.strelka.maf", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.maf"))
         }
       }
       rm(i)
     } else if (fileDNA_mafNum == 2 & length(file_maf) > 2) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_maf)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy.MuTect.seurat.strelka.snvs.maf", paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.snvs.maf"))
-          file.copy("./_template_dummy_files/template_dummy.MuTect.seurat.strelka.indels.maf", paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.indels.maf"))
+          file.copy(system.file("extdata", "template_dummy.MuTect.seurat.strelka.snvs.maf", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.snvs.maf"))
+          file.copy(system.file("extdata", "template_dummy.MuTect.seurat.strelka.indels.maf", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.indels.maf"))
         } else if (length(grep(assayID[i], file_maf)) == 1) {
-          file.copy("./_template_dummy_files/template_dummy.MuTect.seurat.strelka.indels.maf", paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.indels.maf"))
+          file.copy(system.file("extdata", "template_dummy.MuTect.seurat.strelka.indels.maf", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.MuTect.seurat.strelka.indels.maf"))
         }
       }
       rm(i)
@@ -229,7 +229,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_ge) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_ge)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy_salmon_bc_cDNA_genes.sf", paste0(studyID, "_", assayID[i], "_dummy_salmon_bc_cDNA_genes.sf"))
+          file.copy(system.file("extdata", "template_dummy_salmon_bc_cDNA_genes.sf", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy_salmon_bc_cDNA_genes.sf"))
         }
       }
       rm(i)
@@ -240,7 +240,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_fuca) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_fuca)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy.final-list_candidate-fusion-genes.txt", paste0(studyID, "_", assayID[i], "_dummy.final-list_candidate-fusion-genes.txt"))
+          file.copy(system.file("extdata", "template_dummy.final-list_candidate-fusion-genes.txt", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.final-list_candidate-fusion-genes.txt"))
         }
       }
       rm(i)
@@ -251,7 +251,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_star) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_star)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy.star-fusion.fusion_candidates.final.abridged.txt", paste0(studyID, "_", assayID[i], "_dummy.star-fusion.fusion_candidates.final.abridged.txt"))
+          file.copy(system.file("extdata", "template_dummy.star-fusion.fusion_candidates.final.abridged.txt", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.star-fusion.fusion_candidates.final.abridged.txt"))
         }
       }
       rm(i)
@@ -262,7 +262,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     if (length(file_te) > 1) {
       for (i in 1:length(assayID)) {
         if (length(grep(assayID[i], file_te)) == 0) {
-          file.copy("./_template_dummy_files/template_dummy.cufflinks.isoforms.fpkm_tracking", paste0(studyID, "_", assayID[i], "_dummy.cufflinks.isoforms.fpkm_tracking"))
+          file.copy(system.file("extdata", "template_dummy.cufflinks.isoforms.fpkm_tracking", package = "vigilante.knights.sword", mustWork = TRUE), paste0(studyID, "_", assayID[i], "_dummy.cufflinks.isoforms.fpkm_tracking"))
         }
       }
       rm(i)
@@ -308,8 +308,8 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   GRCm38_ref = NULL
 
   if (speciesID == "hg38") {
-    GRCh38G = read.delim("./_ensembl_reference/GRCh38G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End", "Source", "Type"))
-    GRCh38G = GRCh38G[, 1:5]
+    GRCh38G = read.delim("./_ensembl_reference/GRCh38G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End"))
+    GRCh38G[, 3] = paste0("chr", GRCh38G[, 3])
     chr_len_GRCh38G.p13 = read.csv("./_ensembl_reference/chr_len_GRCh38G.p13.csv", stringsAsFactors = FALSE)
     chr_len_H = chr_len_GRCh38G.p13[, 2]
     names(chr_len_H) = chr_len_GRCh38G.p13[, 1]

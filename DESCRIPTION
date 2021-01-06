@@ -41,6 +41,9 @@ Imports:
     grDevices,
     graphics,
     grid,
-    devtools
+    devtools,
+    vigilante.knights.sword (>= 0.0.0.9002)
 Depends: 
     R (>= 2.10)
+Remotes:  
+    yilixu/vigilante.knights.sword

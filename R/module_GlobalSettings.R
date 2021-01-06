@@ -170,7 +170,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     # remove temp name data
     rm(name_pattern, file_name, temp_pair, fileID, file_name_old, file_name_new)
 
-    # create dummy files for incomplete samples
+    # create dummy files for incomplete samples, vks pkg required
     print("Checking if all the samples have the same number of input data files, if not, corresponding dummmy input data files (empty-content placeholders) will be generated to cover the missing parts")
 
     # capture existing file names
@@ -301,45 +301,17 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   }
   rm(temp_folderName)
 
-  # set ENSEMBL reference based on speciesID
+  # set ENSEMBL reference based on speciesID, vks pkg required
   print("Setting ENSEMBL reference for downstream analyses")
   GRCh38_ref = NULL
   GRCh37_ref = NULL
   GRCm38_ref = NULL
-
   if (speciesID == "hg38") {
-    GRCh38G = read.delim("./_ensembl_reference/GRCh38G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End"))
-    GRCh38G[, 3] = paste0("chr", GRCh38G[, 3])
-    chr_len_GRCh38G.p13 = read.csv("./_ensembl_reference/chr_len_GRCh38G.p13.csv", stringsAsFactors = FALSE)
-    chr_len_H = chr_len_GRCh38G.p13[, 2]
-    names(chr_len_H) = chr_len_GRCh38G.p13[, 1]
-    rm(chr_len_GRCh38G.p13)
-    GRCh38T = read.delim("./_ensembl_reference/GRCh38T.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENST", "Transcript", "ENSG", "Gene"))
-    GRCh38_ref = list("GRCh38G" = GRCh38G, "chr_len_H" = chr_len_H, "GRCh38T" = GRCh38T)
-
+    GRCh38_ref = vigilante.knights.sword::GRCh38_ref
   } else if (speciesID == "hg19") {
-    GRCh37G = read.delim("./_ensembl_reference/GRCh37G.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End", "Source", "Type"))
-    GRCh37G = GRCh37G[, 1:5]
-    chr_len_GRCh37G.p13 = read.csv("./_ensembl_reference/chr_len_GRCh37G.p13.csv", stringsAsFactors = FALSE)
-    chr_len_H = chr_len_GRCh37G.p13[, 2]
-    names(chr_len_H) = chr_len_GRCh37G.p13[, 1]
-    rm(chr_len_GRCh37G.p13)
-    GRCh37T = read.delim("./_ensembl_reference/GRCh37T.p13.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENST", "Transcript", "ENSG", "Gene"))
-    GRCh37_ref = list("GRCh37G" = GRCh37G, "chr_len_H" = chr_len_H, "GRCh37T" = GRCh37T)
-
+    GRCh37_ref = vigilante.knights.sword::GRCh37_ref
   } else if (speciesID == "mm10") {
-    GRCm38G = read.delim("./_ensembl_reference/GRCm38G.p6.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENSG", "Gene", "Chr", "Start", "End"))
-    GRCm38G[, 3] = paste0("chr", GRCm38G[, 3])
-    GRCm38G = plyr::arrange(GRCm38G, ENSG)
-    dups = duplicated(GRCm38G[, 2])
-    GRCm38G = subset(GRCm38G, !dups)
-    rm(dups)
-    chr_len_GRCm38G.p6 = read.csv("./_ensembl_reference/chr_len_GRCm38G.p6.csv", stringsAsFactors = FALSE)
-    chr_len_M = chr_len_GRCm38G.p6[, 2]
-    names(chr_len_M) = chr_len_GRCm38G.p6[, 1]
-    rm(chr_len_GRCm38G.p6)
-    GRCm38T = read.delim("./_ensembl_reference/GRCm38T.p6.txt", header = FALSE, stringsAsFactors = FALSE, skip = 1, col.names = c("ENST", "Transcript", "ENSG", "Gene"))
-    GRCm38_ref = list("GRCm38G" = GRCm38G, "chr_len_H" = chr_len_H, "GRCm38T" = GRCm38T)
+    GRCm38_ref = vigilante.knights.sword::GRCm38_ref
   }
 
   # add variables to temp_globalSettings_returnList

@@ -328,11 +328,20 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
     "sampleNum" = sampleNum
   )
 
+  # remove variables already added to temp_prepareVdata_returnList
+  rm(list = names(temp_prepareVdata_returnList))
+
   # add ENSEMBL reference to temp_prepareVdata_returnList
   temp_prepareVdata_returnList = c(temp_prepareVdata_returnList, GRCh38_ref, GRCh37_ref, GRCm38_ref)
 
-  # remove variables already added to temp_prepareVdata_returnList
-  rm(list = names(temp_prepareVdata_returnList))
+  # remove ENSEMBL reference already added to temp_prepareVdata_returnList
+  if (speciesID == "hg38") {
+    rm(GRCh38_ref)
+  } else if (speciesID == "hg19") {
+    rm(GRCh37_ref)
+  } else if (speciesID == "mm10") {
+    rm(GRCm38_ref)
+  }
 
   # end of v_prepareVdata function
   print("Data preparation for vigilante completed")

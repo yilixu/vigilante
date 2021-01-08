@@ -360,7 +360,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #' @param speciesID character, choose one from c("hg38", "hg19", "mm10"), default "hg38". This will affect downstream analysis methods based on different genome reference builds: "hg38" for GRCh38, "hg19" for GRCh37, "mm10" for GRCm38. In addition, each vigilante run should set only one "speciesID" (genome reference build). If input data files involve multiple genome reference build, separate them into multiple vigilante runs of which each uses a single "speciesID".
 #' @param fileNum,fileDNA_mafNum integer, "fileNum" for the maximum total number of input data files per each sample (e.g. there are 50 samples, 35 of them have 5 files per sample, 12 of them have 7 files per sample, 3 of them have 6 files per sample, set "fileNum" to 7); similarly, "fileDNA_mafNum" for the maximum total number of .maf files per each sample (e.g. there are .maf files from Strelka came in a set of 2, while other .maf files from MuTect came in 1, set "fileDNA_mafNum" to 2).
 #' @param clinicalFeature logical, whether input data have associated clinical information (e.g. Gleason score, Race, Ethnicity). If TRUE, addtional columns for specifying clinical information will be added to the vigilante-generated groupInfo.csv file and user needs to fill them before downstream analyses can properly take these clinical information into consideration.
-#' @param createOutputFolders logical, whether to allow vigilante create specific output folders as the default place for storing downstream analyses output files (e.g. plots, results tables). If TRUE, a set of output folders will be created in the working directory under ./_Viz/. It is recommended to set it to TRUE so that downstream analyses output files can be better organized inside "_Viz" folder; if FALSE, user needs to specify a output path each time user chooses to generate a output file.
+#' @param createOutputFolders logical, whether to allow vigilante create specific output folders as the default place for storing downstream analyses output files (e.g. plots, results tables). If TRUE, a set of output folders will be created in the working directory under ./_VK/. It is recommended to set it to TRUE so that downstream analyses output files can be better organized inside "_VK" folder; if FALSE, user needs to specify a output path each time user chooses to generate a output file.
 #' @param prepareVdata logical, whether to allow vigilante prepare all input data files in the working directory. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc. If TRUE, user will be asked to backup input data files before continuing; if FALSE, vigilante will stop the run and no input data files will be affected.
 #'
 #' @details
@@ -405,7 +405,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE, createOutputFolders = FALSE, prepareVdata = FALSE) {
 
   # ask user to make sure "vigilante.knights.sword" package is already installed
-  status_sword = menu(choices = c("Yes", "No"), title = "\nDue to the requirement of CRAN that general packages should not exceed 5MB, the supplemental workbook or reference datasets (sword) required by vigilante & knights have been extracted and put in the separate package vigilante.knights.sword. Please check https://github.com/yilixu/vigilante.knights.sword for more information. vigilante & knights will need 'sword' to perform downstream analysis. Is 'vigilante.knights.sword' package already installed?")
+  status_sword = menu(choices = c("Yes", "No"), title = "\nDue to the requirement of CRAN that general packages should not exceed 5MB, the supplemental workbook or reference datasets (sword) required by vigilante & knights have been extracted and put in the standalone package vigilante.knights.sword. Please check https://github.com/yilixu/vigilante.knights.sword for more information. vigilante & knights will need 'sword' to perform downstream analysis. Is 'vigilante.knights.sword' package already installed?")
   if (status_sword == 1) {
     print("Checking 'vigilante.knights.sword' package status")
     status_sword_check = "vigilante.knights.sword" %in% utils::installed.packages()
@@ -470,21 +470,25 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
 
   # create output folders
   if (createOutputFolders == TRUE) {
-    if (!("_Viz" %in% dir())) {
-      print("Based on user's choice, a set of output folders will be created in the working directory under ./_Viz/")
-      dir.create("_Viz")
-      dir.create("_Viz/_circos")
-      dir.create("_Viz/_chm")
-      dir.create("_Viz/_xcell")
-      dir.create("_Viz/_lollipop")
-      dir.create("_Viz/_igv")
-      dir.create("_Viz/_cse")
-      dir.create("_Viz/_cse/_fusion")
-      dir.create("_Viz/_cse/_mutation")
-      dir.create("_Viz/_sse")
-      dir.create("_Viz/_MuSiCa")
-      dir.create("_Viz/_DESeq2")
-      dir.create("_Viz/_GWAS")
+    if (!("_VK" %in% dir())) {
+      print("Based on user's choice, a set of output folders will be created in the working directory under ./_VK/")
+      dir.create("_data")
+      dir.create("_data/_MuSiCa")
+      dir.create("_VK")
+      dir.create("_VK/_Circos")
+      dir.create("_VK/_CHM")
+      dir.create("_VK/_xCell")
+      dir.create("_VK/_LLP")
+      dir.create("_VK/_IGV")
+      dir.create("_VK/_CSE")
+      dir.create("_VK/_CSE/_Fusion")
+      dir.create("_VK/_CSE/_Mutation")
+      dir.create("_VK/_SSE")
+      dir.create("_VK/_MuSiCa")
+      dir.create("_VK/_DESeq2")
+      dir.create("_VK/_GWAS")
+      dir.create("_VK/_PWC")
+      dir.create("_VK/_TCGA")
     } else {
       print("Output folders already exist, skipping to the next step")
     }
@@ -505,6 +509,9 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
 
   # remove variables already added to temp_globalSettings_returnList
   suppressWarnings(rm(list = names(temp_globalSettings_returnList)))
+
+  # assign globalSettings_returnList in the global environment
+  # assign(x = "globalSettings_returnList", value = temp_globalSettings_returnList, envir = .GlobalEnv)
 
   # end of v_globalSettings function
   print("v_globalSettings run completed, return value saved to the global environment in **globalSettings_returnList**")

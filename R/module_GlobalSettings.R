@@ -454,6 +454,9 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
   }
   rm(status_returnValue)
 
+  # suppress experimental messages from dplyr.summarise
+  options(dplyr.summarise.inform = FALSE)
+
   # set global variables required for downstream process
   temp_globalSettings_returnList = list(
     "studyID" = studyID,

@@ -43,9 +43,6 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
   }
   rm(status_returnValue)
 
-  # suppress experimental messages from dplyr.summarise
-  options(dplyr.summarise.inform = FALSE)
-
   # check if globalSettings_returnList exists
   if (!exists("globalSettings_returnList")) {
     print("globalSettings_returnList not detected, please follow the instruction and run v_globalSettings function before continue")

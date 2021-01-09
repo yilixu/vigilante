@@ -69,6 +69,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   rm(groupInfo)
 
   # ask user to make sure groupInfo.csv is properly filled in
+  print("By default, 'groupInfo.csv' has five columns: 'assayID', 'Group', 'MAF_group', 'realID' and 'aliasID'. If 'clinicalFeature' is set to TRUE, there can be more columns. Usually, user should leave 'assayID', 'MAF_group' and 'realID' unchanged as they are auto-populated by vigilante and already in the right format. The 'aliasID' column can be changed if user wants to set specific names for their samples, and this change can only be made after the first run or when input files are already moved into position, otherwise should be left unchanged as well. The 'Group' column (and possible additional 'CliFea' columns) is where user should properly fill in.")
   status_groupInfo = menu(choices = c("Yes", "No"), title = "\nIs groupInfo.csv properly filled in?")
   if (status_groupInfo == 1) {
     print("groupInfo.csv is properly filled in, now continue to the next step")

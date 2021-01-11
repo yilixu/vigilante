@@ -229,5 +229,81 @@ v_prepareVdata_xCell = function(doGE = FALSE, doLocalAnalysis = FALSE, colSliceO
   return(temp_prepareVdata_xCell_returnList)
 }
 
+
+
+#' Calculate log10 fold-change value for module xCell
+#'
+#' (Internal) Helper function, used to calculate log10 fold-change value for module xCell, should be called within the main function (v_chmXcell).
+#'
+#' @keywords internal
+
+# v_chmFoldChangeLog10_xCell function
+v_chmFoldChangeLog10_xCell = function(outputFolderPath, log10Threshold, grpName_fc, filterNoTPM) {
+
+  # get variables from parent function
+  studyID = get("studyID", envir = parent.frame())
+
+  # temporarily turn ge.chm.pmg into xcell.pmg for downstream calculation
+  xcell.pmg = get("ge.chm.pmg", envir = parent.frame())
+
+  # group up and calculate average xCell enrichment score
+  xcell.pmg.fc = subset(xcell.pmg, subset = Group %in% grpName_fc)
+  xcell.pmg.fc = xcell.pmg.fc %>% dplyr::group_by(Cell.Type, Group) %>% dplyr::summarise_at(.vars = "Enrichment.Score", .fun = list(Enrichment.Score_avg = mean))
+
+  # turn xcell.pmg.fc into a list
+  xcell.foldchange = list()
+  for (i in 1:length(grpName_fc)) {
+    xcell.foldchange[[i]] = subset(xcell.pmg.fc, subset = Group == grpName_fc[i])[, c(1, 3)]
+  }
+  rm(i, xcell.pmg.fc)
+  names(xcell.foldchange) = grpName_fc
+
+  # replace NA and negative value with 0
+  xcell.foldchange = lapply(xcell.foldchange, function(x) {
+    x[is.na(x[, 2]), 2] = 0
+    x[x[, 2] < 0, 2] = 0
+    return(x)
+  })
+
+  # filter out genes with Enrichment.Score = 0 in both groups
+  if (filterNoTPM == TRUE) {
+    xcell.foldchange = lapply(xcell.foldchange, function(x) {
+      noES = (xcell.foldchange[[1]][, 2] == 0) & (xcell.foldchange[[2]][, 2] == 0)
+      x = x[!noES, ]
+    })
+  }
+
+  # add 10e-32 to fix 0 denominator issue
+  min0offset_fc_xcell = min(sapply(xcell.foldchange, function(x) {min(x[x[, 2] > 0, 2])})) / 10
+  min0offset_fc_xcell = 10 ^ (floor(log10(min0offset_fc_xcell)))
+  xcell.foldchange = lapply(xcell.foldchange, function(x) {
+    x[, 2] = x[, 2] + min0offset_fc_xcell # add 10e-32 to fix log(0) issue
+    return(x)
+  })
+
+  # calculate fold change
+  xcell.foldchange[[3]] = xcell.foldchange[[grpName_fc[2]]]
+  xcell.foldchange[[3]][, 2] = log10(xcell.foldchange[[3]][, 2] / xcell.foldchange[[grpName_fc[1]]][, 2])
+  xcell.foldchange = xcell.foldchange[[3]]
+  colnames(xcell.foldchange) = c("Cell_Type", "Log10_FC")
+
+  # classify fold change based on threshold
+  xcell.foldchange["Exp_Level"] = dplyr::case_when(
+    xcell.foldchange[, 2] >= log10Threshold[1] ~ "Up-Regulated",
+    xcell.foldchange[, 2] <= log10Threshold[2] ~ "Down-Regulated",
+    (xcell.foldchange[, 2] < log10Threshold[1]) & (xcell.foldchange[, 2] > log10Threshold[2]) ~ "Within-Threshold"
+  )
+
+  # select up- and down-regulated genes
+  xcell.foldchange.udr = subset(xcell.foldchange, subset = Exp_Level != "Within-Threshold")
+
+  # write xcell.foldchange to csv file
+  write.csv(xcell.foldchange, file = paste0(outputFolderPath, studyID, "_xCell_foldchange_3ExprLvls.csv"), quote = FALSE, row.names = FALSE)
+
+  # end of chmFoldChangeLog10 function
+  print(as.character(glue::glue("v_chmFoldChangeLog10_xCell completed, output csv file saved in {outputFolderPath}")))
+  return(xcell.foldchange)
+}
+
 # preset globalVariables for R CMD check
-utils::globalVariables(c("GRCm2h38C", "Gene", "Occurrence", "TotalOccurrence", "gdc_ge.list.c_xcell", "gdc_ge.list_FPKM", "iSample", "nSamples", "progressBar"))
+utils::globalVariables(c("GRCm2h38C", "Gene", "Occurrence", "TotalOccurrence", "gdc_ge.list.c_xcell", "gdc_ge.list_FPKM", "iSample", "nSamples", "progressBar", "Cell.Type", "Exp_Level"))

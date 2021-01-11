@@ -305,7 +305,6 @@ v_chmFoldChangeLog10_xCell = function(outputFolderPath, log10Threshold, grpName_
   return(xcell.foldchange)
 }
 
-<<<<<<< HEAD
 
 
 #' Combine the main body and side annotation of heatmap for module xCell
@@ -337,7 +336,5 @@ v_magick_xCell = function(outputFolderPath, sigType) {
   rm(chm_mainbody, chm_bpanno, chm_combined)
 }
 
-=======
->>>>>>> 6d197814e5b04b3fa61476bfd234e493a092ec1e
 # preset globalVariables for R CMD check
 utils::globalVariables(c("GRCm2h38C", "Gene", "Occurrence", "TotalOccurrence", "gdc_ge.list.c_xcell", "gdc_ge.list_FPKM", "iSample", "nSamples", "progressBar", "Cell.Type", "Exp_Level"))

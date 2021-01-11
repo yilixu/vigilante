@@ -3,6 +3,7 @@
 export(v_Circos)
 export(v_globalSettings)
 export(v_prepareVdata_Circos)
+export(v_prepareVdata_xCell)
 import(ComplexHeatmap)
 import(circlize)
 import(grDevices)

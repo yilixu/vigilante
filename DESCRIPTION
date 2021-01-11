@@ -1,6 +1,6 @@
 Package: vigilante
 Title: Visualizing Integrated Genomics in Linked and Nested Translational Elaboration & Knowing Numbers in Genomic Hypothesis Through Statistics
-Version: 0.0.0.9002
+Version: 0.0.0.9003
 Authors@R: c(
     person("Yili", "Xu", email = "yilixu@usc.edu", role = c("aut", "cre")),
     person("Zarko", "Manojlovic", email = "zmanojlo@usc.edu", role = c("aut")), 
@@ -42,8 +42,9 @@ Imports:
     graphics,
     grid,
     devtools,
-    vigilante.knights.sword (>= 0.0.0.9002)
+    vigilante.knights.sword (>= 0.0.0.9002),
+    magick
 Depends: 
     R (>= 2.10)
-Remotes:  
+Remotes: 
     yilixu/vigilante.knights.sword

@@ -5,7 +5,7 @@
 \title{Main function for module: Circos}
 \usage{
 v_Circos(
-  outputFolderPath = "./_Viz/_circos/",
+  outputFolderPath = "./_VK/_Circos/",
   startNum = NULL,
   endNum = NULL,
   doBAF = FALSE,
@@ -16,7 +16,7 @@ v_Circos(
 )
 }
 \arguments{
-\item{outputFolderPath}{string, relative or absolute path to the output folder, can be set to NULL (no output file will be written to the file system), default "./_Viz/_circos/".}
+\item{outputFolderPath}{string, relative or absolute path to the output folder, can be set to NULL (no output file will be written to the file system), default "./_VK/_Circos/".}
 
 \item{startNum}{integer, by default, vigilante will go through every individual sample and sample group, generating a Circos plot per each item in the list. If an integer is specified, vigilante will instead start generating Circos plots at the specified index (e.g. there 10 samples and 2 groups in the list, set startNum to 11 will make vigilante start generating Circos plots at the first group). If set to NULL, vigilante will automatically detect Circos pltos already existing in the output folder and continue at the most recent generated one (e.g. there are 12 Circos plots in total to be generated and 6 of them already exist in the output folder, to make sure all plots are fully-rendered, vigilante will continue at the 6th plot and overwrite it). Since generating comprehensive Circos plots is very computational-intensive, it is possible that function run get interrupted and half-rendered plots get generated because of running out of memory. Therefore, it is recommended to set startNum to NULL so that vigilante can ensure every item in the list to be plotted get fully-rendered.}
 

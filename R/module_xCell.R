@@ -336,5 +336,610 @@ v_magick_xCell = function(outputFolderPath, sigType) {
   rm(chm_mainbody, chm_bpanno, chm_combined)
 }
 
+
+
+#' Main function for module: xCell
+#'
+#' Extract, clean and reform NGS data prepared by v_prepareVdata_xCell function, and then perform local Cell Type Enrichment Analysis (based on xCell) in addition to a set of in-house filtering process and other statistical analysis based on user's choice.
+#'
+#' @param outputFolderPath string, relative or absolute path to the output folder, trailing slash "/" required, can be set to NULL (no output file will be written to the file system), default "./_VK/_xCell/" for module xCell.
+#' @param ge.xcell.result main input, automatically extracted from the prepared data, can (or probably should) be omitted in function call.
+#' @param filterOutlier logic, whether to filter outliers and exclude them from downstream analysis.
+#' @param filterOutlier_fromGroup character vector, if "filterOutlier" is set to TRUE, filter outliers from the selected groups and ignore outliers from other groups. By default will use the internal character vector "grpName" and can be left unchanged.
+#' @param filterStringency numeric, the ratio that outliers can be allowed in each selected group, from 0 to 1, default 0.1 (10\%), calculation will be rounded down to integer. For example, if there are 24 samples in a group and filterStringency is set to 0.1, the number of allowed outliers in this group will be 2. See Details for more information about how "filterOutlier" works.
+#' @param filterNoTPM logic, whether to filter out cell types that have Enrichment.Score = 0 in all samples, preferably TRUE to prevent error in significance test (error: data are essentially constant).
+#' @param significanceTest logic, whether to perform significance test, the type of test will be automatically adjustd based on the input data and other settings (e.g. number of groups).
+#' @param significanceTest_inputForm character, choose one from c("log10", "log2", "raw"), use log10, log2 or raw value to perform significance test. By default will use "raw" for module xCell, and preferably be left unchanged.
+#' @param significanceTest_fdrq logic, whether to calculate and display false discovery rate q-value, user-set value may be automatically modified due to interplay.
+#' @param shadowGroup list(logic, numeric), [[1]] whether to create shadow/virtual group for each individual sample (grpName will be modified based on aliaseID); [[2]] number of shadow groups per sample. "shadowGroup" can only be used when each original group only contains one individual sample; only works for "significanceTest", will disable "calculateFC"; user-set value may be automatically modified (with notice) due to interplay.
+#' @param calculateFC logic, whether to calculate log10 fold-change value, user-set value may be automatically modified (with notice) due to interplay.
+#' @param log10Threshold numeric vector, upper and lower cutoff points in log10 form for deciding fold-change levels ("Up-Regulated", "With-Threshold", "Down-Regulated"). By default will use c(0.3, -0.3), which equal to the generally accepted fold-change threshold in non-log form (two-fold and half-fold, respectively).
+#' @param rowSliceOrder character vector, the order (from top to bottom) of fold-change levels (if applicable) to be shown on the output plots and files. By default will use c("Up-Regulated", "Within-Threshold", "Down-Regulated") for module xCell, and preferably be left unchanged.
+#' @param colSliceOrder character vector, the order (from left to right) of groups to be shown on the output plots and files, should be set to the same value when called from different functions within the same module (e.g., v_prepareVdata_xCell and v_chmXcell). By default will use the internal character vector "grpName" and can be left unchanged. Groups not included in the "colSliceOrder" will also be excluded from the output plots and files (in most cases), and from certain analysis process (depending on the situation).
+#' @param grpName_fc character vector, two groups selected for fold-change calculation. Order matters, the first group will be used as the denominator, whereas the second as the nominator.
+#' @param grpName_pval character vector, groups selected for significance test if "significanceTest" is set to TRUE. Order does not matter, but number of groups may affect the type of test. If provided, should have at least two groups.
+#' @param addBpAnno logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
+#' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder".
+#' @param colorScheme list(character, numeric vector), set color scheme for heatmap mainbody, [[1]] mode, choose one from c("continuous", "discrete"); [[2]] breakpoints, should be a numeric vector containing breakpoints ranging from 0 to 1, inclusive; moreover, breakpoints are only used in "discrete" mode, and will be ignored in "continuous" mode. Recommended values are list(mode = "continuous", breakpoints = NULL) and list(mode = "discrete", breakpoints = seq(from = 0, to = 1, by = 0.2)). By default, will use the first recommended value, list(mode = "continuous", breakpoints = NULL).
+#'
+#' @details
+#' Here is more information about how "filterOutlier" works. To begin with, vigilante takes the generally accepted definition of outliers: observations that lie outside 1.5 * IQR (Inter Quartile Range) of the 25th or 75th quartiles are regarded as outliers.
+#'
+#' Assuming there is a project containing 100 samples which are divided into 3 groups (Group 1: 24, Group 2: 36, Group 3: 40). The data contains 10,000 observations per sample, and vigilante has detected outliers of observation A and B in the following:
+#' Group 1: A 3, B 2;
+#' Group 2: A 0, B 3;
+#' Group 3: A 0, B 4.
+#'
+#' Under default "filterStringency" of 0.1, observation A will be excluded from downstream analysis, because A has 3 outliers in Group 1 which exceeds the number of allowed outliers in this group (24 * 0.1 = 2.4, rounded down to 2), even if there is no outlier of A in Group 2 or 3. On the other hand, though observation B has 2/3/4 outliers in Group 1/2/3, B will still be kept for downstream analysis because these numbers do not exceed the number of allowed outliers in their repective groups.
+#'
+#' Moreover, if "filterStringency" is changed to 0.05, observation B will be excluded from downstream analysis as well; if "filterStringency" is changed to 0.15, observation A will no longer be excluded from downstream analysis.
+#'
+#' Therefore, it is up to the user to decide whether or not to filter outliers, and how much stringency should be imposed on the filtering process.
+#'
+#' @return NULL, when a valid outputFolderPath is provided, analysis results and output plots will be generated and saved in the provided location, otherwise function run will stop and nothing will be written into the file system.
+#'
+#' @import ggplot2 ggpubr qvalue
+#'
+#' @export
+#'
+# v_chmXcell function
+v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.xcell.result, filterOutlier = FALSE, filterOutlier_fromGroup = grpName, filterStringency = 0.1, filterNoTPM = FALSE, significanceTest = FALSE, significanceTest_inputForm = "raw", significanceTest_fdrq = FALSE, shadowGroup = list(FALSE, 5), calculateFC = FALSE, log10Threshold = c(0.3, -0.3), rowSliceOrder = c("Up-Regulated", "Within-Threshold", "Down-Regulated"), colSliceOrder = grpName, grpName_fc = grpName, grpName_pval = grpName, addBpAnno = FALSE, unsupervisedClustering = FALSE, colorScheme = list(mode = "continuous", breakpoints = seq(0, 1, 0.2))) {
+
+  # check if outputFolderPath is set
+  if (is.null(outputFolderPath)) {
+    print("v_chmXcell run stopped: based on user's choice, output files and plots will not be generated")
+    stop()
+  } else {
+    print(as.character(glue::glue("Based on user's choice, output files and plots will be generated and saved in {outputFolderPath}")))
+  }
+
+  # check if globalSettings_returnList exists
+  if (!exists("globalSettings_returnList")) {
+    print("globalSettings_returnList not detected, please follow the instruction and run v_globalSettings function before continue")
+    stop()
+  } else {
+    print("globalSettings_returnList detected, start extracting global settings")
+  }
+
+  # extract global settings from return list
+  for (i in 1:length(globalSettings_returnList)) {
+    assign(x = names(globalSettings_returnList)[i], value = globalSettings_returnList[[i]])
+  }
+  rm(i)
+
+  # check if prepareVdata_xCell_returnList exists
+  if (!exists("prepareVdata_xCell_returnList")) {
+    print("prepareVdata_xCell_returnList not detected, please follow the instruction and run v_prepareVdata_xCell function before continue")
+    stop()
+  } else {
+    print("prepareVdata_xCell_returnList detected, start extracting xCell variables")
+  }
+
+  # extract xCell variables from return list
+  for (i in 1:length(prepareVdata_xCell_returnList)) {
+    assign(x = names(prepareVdata_xCell_returnList)[i], value = prepareVdata_xCell_returnList[[i]])
+  }
+  rm(i)
+
+  # arguments modifiers, v_chmXcell
+  print("Checking the values of the following arguments, modifiers may be applied due to interplay. Please check argument description for more information.")
+  print("----------Original values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno}")))
+
+  significanceTest_fdrq = significanceTest_fdrq & significanceTest
+  shadowGroup[[1]] = shadowGroup[[1]] & (length(unlist(grp.list)) == length(grp.list))
+  calculateFC = (calculateFC & length(grpName_fc) == 2) & !shadowGroup[[1]]
+  addBpAnno = addBpAnno & significanceTest
+
+  print("----------Updated values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno}")))
+
+  # assign ge.xcell.result to ge.chm
+  ge.chm = ge.xcell.result
+
+  # extract grp.list.xcell from grp.list
+  grp.list.xcell = list()
+  for (i in 1:length(grpName)) {
+    grp.list.xcell[[i]] = grp.list[[i]][grp.list[[i]] %in% names(ge.list.c)]
+  }
+  rm(i)
+  names(grp.list.xcell) = grpName
+
+  # filter out outlier cell types
+  if (filterOutlier == TRUE) {
+    xcell.p = ge.chm
+    xcell.pm = reshape2::melt(xcell.p)
+    xcell.pmg = xcell.pm
+    xcell.pmg["Group"] = factor(plyr::mapvalues(xcell.pmg[, 2], from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE), levels = colSliceOrder)
+    colnames(xcell.pmg) = c("Cell.Type", "Sample.ID", "Enrichment.Score", "Group")
+    ge.grp.iqr = xcell.pmg %>% dplyr::group_by(Cell.Type, Group)
+    ge.grp.iqr = dplyr::summarise_at(ge.grp.iqr, .vars = "Enrichment.Score", .fun = list(Outlier = ~length(unlist(boxplot.stats(Enrichment.Score)["out"]))))
+    rm(xcell.p, xcell.pm, xcell.pmg)
+
+    # filter outlier from selected group only
+    ge.grp.iqr = subset(ge.grp.iqr, Group %in% filterOutlier_fromGroup)
+    grp.list.xcell = subset(grp.list.xcell, names(grp.list.xcell) %in% filterOutlier_fromGroup)
+
+    # original filter process
+    for (i in 1:length(grp.list.xcell)) {
+      filterThreshold = floor(length(grp.list.xcell[[i]]) * filterStringency)
+      ge.grp.iqr[ge.grp.iqr$Group == names(grp.list.xcell)[i] & ge.grp.iqr$Outlier <= filterThreshold, 3] = 0
+    }
+    rm(i, filterThreshold)
+
+    ge.iqr = ge.grp.iqr %>% dplyr::group_by(Cell.Type) %>% dplyr::summarise_at(.vars = "Outlier", .fun = list(TotalOutlier = sum))
+    xcell_type.filtered = unlist(subset(ge.iqr, subset = TotalOutlier == 0)[, 1])
+    ge.chm = subset(ge.chm, subset = rownames(ge.chm) %in% xcell_type.filtered)
+    rm(ge.grp.iqr, ge.iqr, xcell_type.filtered)
+  }
+
+  # subset ge.chm and grp.list.xcell for plot purpose only, e.g. use Normal group for background subtraction but don't show this group
+  if (length(colSliceOrder) != length(grpName)) {
+    print(glue::glue("Group not shown: {setdiff(grpName, colSliceOrder)}"))
+    colnames_temp = colnames(ge.chm)
+    grp.list.xcell_temp = grp.list.xcell[names(grp.list.xcell) %in% colSliceOrder]
+    groupInfo_temp = subset(groupInfo, subset = Group %in% colSliceOrder)
+    colnames_temp = colnames_temp %in% groupInfo_temp$aliasID
+    ge.chm = subset(ge.chm, select = colnames_temp)
+    rm(colnames_temp, grp.list.xcell_temp)
+  } else {
+    groupInfo_temp = groupInfo
+  }
+
+  # convert ge.chm to ge.chm.p, and set ge.chm.pmg
+  ge.chm.p = ge.chm
+  ge.chm.p[is.na(ge.chm.p)] = 0 # replace NA with 0
+  ge.chm.p[ge.chm.p < 0] = 0 # replace negative value with 0 (for subtraction-normolized group)
+  if (filterNoTPM == TRUE) {
+    selectedCol = plyr::mapvalues(colnames(ge.chm.p), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE)
+    selectedCol = selectedCol %in% grpName_pval
+    ge.chm.p = ge.chm.p[rowSums(ge.chm.p[, selectedCol], na.rm = TRUE) != 0, ] # filter out genes that have TPM = 0 in grpName_pval group samples to prevent "data are essentially constant" error
+    rm(selectedCol)
+  }
+  min0offset_xcell_min = min(ge.chm.p[ge.chm.p > 0]) / 10
+  min0offset_xcell_min = 10 ^ (floor(log10(min0offset_xcell_min)))
+  min0offset_xcell_max = 10 ^ (-ceiling(log10(max(ge.chm.p))))
+  min0offset_xcell = min(min0offset_xcell_min, min0offset_xcell_max)
+  rm(min0offset_xcell_min, min0offset_xcell_max)
+  ge.chm.p = ge.chm.p + min0offset_xcell # add 10e-32 to fix 0 denominator issue
+  if (significanceTest_inputForm == "log10") {
+    ge.chm.pm = reshape2::melt(log10(ge.chm.p))
+  } else if (significanceTest_inputForm == "log2") {
+    ge.chm.pm = reshape2::melt(log2(ge.chm.p))
+  } else {
+    ge.chm.pm = reshape2::melt(ge.chm.p)
+  }
+  ge.chm.pmg = ge.chm.pm
+  ge.chm.pmg["Group"] = factor(plyr::mapvalues(ge.chm.pmg[, 2], from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE), levels = colSliceOrder)
+  colnames(ge.chm.pmg) = c("Cell.Type", "Sample.ID", "Enrichment.Score", "Group")
+  rm(ge.chm.pm)
+
+  # reform ge.chm.pmg and set grp.list.xcell_shadow
+  if (shadowGroup[[1]] == TRUE) {
+    grpName_pval = groupInfo$aliasID
+    grp.list.xcell_shadow = c(rep(list(ge.chm.pmg), times = shadowGroup[[2]]))
+    grp.list.xcell_shadow = lapply(grp.list.xcell_shadow, function(x) {
+      x$Group = x$Sample.ID
+      return(x)
+    })
+    names(grp.list.xcell_shadow) = paste0("shadow_", 1:shadowGroup[[2]])
+    shadow_multiplier = seq(from = 0.5, to = 1.5, length.out = shadowGroup[[2]])
+    for (i in 1:shadowGroup[[2]]) {
+      grp.list.xcell_shadow[[i]]$Sample.ID = paste0(grp.list.xcell_shadow[[i]]$Sample.ID, "_", names(grp.list.xcell_shadow)[i])
+      grp.list.xcell_shadow[[i]]$Enrichment.Score = grp.list.xcell_shadow[[i]]$Enrichment.Score * shadow_multiplier[i]
+    }
+    rm(i)
+    grp.list.xcell_shadow = dplyr::bind_rows(grp.list.xcell_shadow)
+    ge.chm.pmg = grp.list.xcell_shadow
+    rm(grp.list.xcell_shadow, shadow_multiplier)
+  } else {
+    ge.chm.pmg = subset(ge.chm.pmg, subset = Group %in% grpName_pval)
+  }
+
+  # add t-test/anova significance test based number of groups, and prepare data for boxplot annotation
+  if (significanceTest == TRUE) {
+    tempPaired = (length(grpName_pval) == 2) & (sum(assayID_rna %in% grp.list[[grpName_pval[1]]]) == sum(assayID_rna %in% grp.list[[grpName_pval[2]]]))
+    if (shadowGroup[[1]] == TRUE) {
+      tempPaired = TRUE
+    }
+    ge.chm.p.pval = compare_means(Enrichment.Score ~ Group, data = ge.chm.pmg, method = ifelse(length(grpName_pval) > 2, "anova", "t.test"), group.by = "Cell.Type", paired = tempPaired)
+    tempRownames = ge.chm.p.pval$Cell.Type
+    ge.chm.p.pval = as.matrix(ge.chm.p.pval$p)
+    rownames(ge.chm.p.pval) = tempRownames
+    colnames(ge.chm.p.pval) = "p-value"
+    ge.chm.p.pval.sig = subset(ge.chm.p.pval, subset = ge.chm.p.pval[, 1] <= 0.05)
+    tempRownames_sig = rownames(ge.chm.p.pval.sig)
+    ge.chm.p = ge.chm.p[rownames(ge.chm.p) %in% tempRownames, ]
+    ge.chm.pmg.sig = subset(ge.chm.pmg, subset = Cell.Type %in% tempRownames_sig)
+
+    # calculate false discovery rate q-value (fdrq)
+    if (significanceTest_fdrq == TRUE) {
+      ge.chm.p.fdrq = qvalue(p = unlist(ge.chm.p.pval[, 1]), pi0 = 1)[["qvalues"]]
+      ge.chm.p.fdrq = as.matrix(ge.chm.p.fdrq)
+      colnames(ge.chm.p.fdrq) = "q-value"
+      ge.chm.p.fdrq.sig = subset(ge.chm.p.fdrq, subset = rownames(ge.chm.p.fdrq) %in% tempRownames_sig)
+    }
+
+    # conduct pair-wise t-test for detailed csv output of ANOVA test
+    if (length(grpName_pval) > 2 & nrow(ge.chm.pmg.sig) > 0 & shadowGroup[[1]] == FALSE) {
+
+      # shuffle the data (add slight randomness to the constant part) to prevent "data are essentially constant" error
+      tempMinVal = min(ge.chm.pmg.sig[, 3])
+      for (i in 1:nrow(ge.chm.pmg.sig)) {
+        if (ge.chm.pmg.sig[i, 3] == tempMinVal) {
+          tempShuffle = runif(1) / 1e32
+          ge.chm.pmg.sig[i, 3] = ge.chm.pmg.sig[i, 3] + tempShuffle
+          rm(tempShuffle)
+        }
+      }
+      rm(i, tempMinVal)
+
+      # original pair-wise t-test process
+      ge.chm.p.pval.sig.ttest = compare_means(Enrichment.Score ~ Group, data = ge.chm.pmg.sig, method = "t.test", group.by = "Cell.Type", paired = tempPaired)
+      ge.chm.p.pval.sig.ttest = ge.chm.p.pval.sig.ttest[, c(1, 3:5, 8)]
+      colnames(ge.chm.p.pval.sig.ttest) = c("Cell_Type", "Group_1", "Group_2", "p-value", "Significance_Level")
+      ge.chm.p.pval.sig.ttest["NOTES"] = ""
+      ge.chm.p.pval.sig.ttest[1, "NOTES"] = "Open this file with a text editor in case Excel-unsupported encoding characters appear."
+      print(as.character(glue::glue("Additional pair-wise t-test completed, output csv file saved in {outputFolderPath}")))
+      write.csv(ge.chm.p.pval.sig.ttest, file = paste0(outputFolderPath, studyID, "_xCell_PairWiseTTest_fromAnovaSigOnly.csv"), quote = FALSE, row.names = FALSE, fileEncoding = "UTF-8")
+      rm(ge.chm.p.pval.sig.ttest)
+    }
+
+    # rm temp significance test variables
+    rm(tempRownames, tempRownames_sig, ge.chm.p.pval.sig, tempPaired)
+  }
+
+  # calculate fold change log10 ratio for xCell enrichment score data
+  if (calculateFC == TRUE) {
+    xcell.foldchange = v_chmFoldChangeLog10_xCell(outputFolderPath, log10Threshold, grpName_fc, filterNoTPM)
+    signature_panel.fc = xcell.foldchange[, -3]
+    signature_panel.fc = subset(signature_panel.fc, subset = Cell_Type %in% rownames(ge.chm.p))
+    signature_panel.fc = dplyr::arrange(signature_panel.fc, dplyr::desc(Log10_FC))
+    ge.chm.p = ge.chm.p[signature_panel.fc$Cell_Type, ]
+    if (significanceTest == TRUE) {
+      ge.chm.p.pval = as.matrix(ge.chm.p.pval[signature_panel.fc$Cell_Type, ])
+      colnames(ge.chm.p.pval) = "p-value"
+    }
+    if (significanceTest_fdrq == TRUE) {
+      ge.chm.p.fdrq = as.matrix(ge.chm.p.fdrq[signature_panel.fc$Cell_Type, ])
+      colnames(ge.chm.p.fdrq) = "q-value"
+    }
+    tempRownames.fc = signature_panel.fc$Cell_Type
+    signature_panel.fc = as.matrix(signature_panel.fc[, -1])
+    rownames(signature_panel.fc) = tempRownames.fc
+    colnames(signature_panel.fc) = "Log10_FC"
+    rm(tempRownames.fc)
+  }
+
+  # output significance test and fold-change calculation results to csv file
+  if (any(significanceTest, calculateFC)) {
+    outputCSV_moduleStatus = c(signature_panel.fc = calculateFC, ge.chm.p.pval= significanceTest, ge.chm.p.fdrq = significanceTest_fdrq)
+    tempCSV = ""
+    for (i in 1:length(outputCSV_moduleStatus)) {
+      if (outputCSV_moduleStatus[i] == TRUE) {
+        if (nchar(tempCSV) == 0 ) {
+          tempCSV = paste0(tempCSV, names(outputCSV_moduleStatus)[i])
+        } else {
+          tempCSV = paste0(tempCSV, ", ", names(outputCSV_moduleStatus)[i])
+        }
+      }
+    }
+    rm(i)
+    tempCSV = glue::glue("cbind({tempCSV})")
+    tempCSV = eval(parse(text = tempCSV))
+    rm(outputCSV_moduleStatus)
+
+    tempCSV = as.data.frame(tempCSV, stringAsFactor = FALSE)
+    tempCSV_suffix = c("_FC" = calculateFC, "_pval" = significanceTest, "_fdrq" = significanceTest_fdrq)
+    tempCSV_suffix = tempCSV_suffix[tempCSV_suffix]
+    tempCSV_suffix = names(tempCSV_suffix)
+    tempCSV_suffix = paste0(tempCSV_suffix, collapse = "")
+    tempCSV["NOTES"] = ""
+    tempCSV[1, "NOTES"] = "Open this file with a text editor in case many false 0 values appear (Excel only supports maximum precision digits of 15)."
+    print(as.character(glue::glue("Local computation and analysis completed, output csv file saved in {outputFolderPath}")))
+    write.csv(tempCSV, file = paste0(outputFolderPath, studyID, "_xCell_all_types", tempCSV_suffix, ".csv"), quote = FALSE, row.names = TRUE, fileEncoding = "UTF-8")
+    rm(tempCSV, tempCSV_suffix)
+  }
+
+  # reset column order based on groupInfo$aliasID
+  ge.chm.p = ge.chm.p[, sort(colnames(ge.chm.p))]
+
+  # preset default chm_fdrq annotation for chm.sigpan_ge.pval
+  chm_fdrq = NULL
+
+  # set chm_fdrq annotation for chm.sigpan_ge.pval
+  if (significanceTest == TRUE & significanceTest_fdrq == TRUE) {
+    ge.chm.p.fdrq.nglog10 = -log10(ge.chm.p.fdrq)
+    SPCM.breakpoint.fdrq = ceiling(max(ge.chm.p.fdrq.nglog10))
+    SPCM.breakpoint.fdrq = max(SPCM.breakpoint.fdrq, 2)
+    if (SPCM.breakpoint.fdrq %% 2 != 0) {
+      SPCM.breakpoint.fdrq = SPCM.breakpoint.fdrq + 1
+    }
+    SPCM.fdrq = colorRamp2(breaks = c(0, SPCM.breakpoint.fdrq), colors = c("white", "red3"))
+    chm_fdrq_col = SPCM.fdrq(ge.chm.p.fdrq.nglog10[, 1])
+    if (nrow(ge.chm.pmg.sig) > 0) {
+      ge.chm.p.fdrq.nglog10.sig = -log10(ge.chm.p.fdrq.sig)
+      chm_fdrq_col.sig = SPCM.fdrq(ge.chm.p.fdrq.nglog10.sig[, 1])
+    }
+    chm_fdrq = rowAnnotation(NgLog10_FDR = anno_barplot(ge.chm.p.fdrq.nglog10[, 1], baseline = 0, gp = gpar(fill = chm_fdrq_col, col = chm_fdrq_col), bar_width = 0.66, axis_param = list(at = c(0, SPCM.breakpoint.fdrq * 0.5, SPCM.breakpoint.fdrq, 1.3), labels = as.character(c(0, SPCM.breakpoint.fdrq * 0.5, SPCM.breakpoint.fdrq, "p")), gp = gpar(fontsize = 6), labels_rot = 0, side = "bottom"), ylim = c(0, SPCM.breakpoint.fdrq)), annotation_name_gp = gpar(fontsize = 8, fontface = "bold"), annotation_name_side = "bottom", annotation_name_rot = 0, width = unit(2, "cm"))
+  }
+
+  # set parameter for splitting rows and columns
+  if (calculateFC == TRUE) {
+    split_row = factor(plyr::mapvalues(rownames(ge.chm.p), from = xcell.foldchange$Cell_Type, to = xcell.foldchange$Exp_Level, warn_missing = FALSE), levels = rowSliceOrder)
+  } else {
+    split_row = NULL
+    rowSliceOrder = "Undefined"
+  }
+  temp_groupInfo = groupInfo_temp
+  temp_groupInfo = plyr::arrange(temp_groupInfo, aliasID)
+  temp_groupInfo = subset(temp_groupInfo, subset = assayID %in% names(ge.list.c))
+  split_col = factor(unlist(temp_groupInfo$Group), levels = colSliceOrder)
+  rm(temp_groupInfo, groupInfo_temp)
+  if (unsupervisedClustering == TRUE) {
+    split_row = NULL
+    rowSliceOrder = "Undefined"
+    split_col = NULL
+  }
+
+  # set color mapping
+  if (colorScheme[["mode"]] == "continuous") {
+    SPCM.es = colorRamp2(c(0, 1), c("white", "royalblue3"))
+    SPCM.es_lgd = list(direction = "horizontal", col_fun = SPCM.es, title = "Enrichment\n     Score", legend_width = unit(2, "cm"), at = c(0, 1))
+  } else if (colorScheme[["mode"]] == "discrete") {
+    SPCM.es_mat = cut(x = sort(as.vector(ge.xcell.result)), breaks = seq(from = 0, to = 1, by = 0.2), labels = NULL, include.lowest = FALSE, right = TRUE, dig.lab = 1, ordered_result = FALSE)
+    SPCM.es_lvl = levels(SPCM.es_mat)
+    # SPCM.es_color = colorspace::sequential_hcl(n = length(SPCM.es_lvl), h = 260, c = c(45, 90), l = c(90, 45), power = 1)
+    SPCM.es_tempContinuous = colorRamp2(c(0, 1), c("white", "royalblue3"))
+    SPCM.es_color = SPCM.es_tempContinuous(seq(0.2, 1, 0.2))
+    SPCM.es_obj = ColorMapping(colors = SPCM.es_color, levels = SPCM.es_lvl, na_col = "white")
+    SPCM.es = map_to_colors(object = SPCM.es_obj, x = SPCM.es_mat)
+    SPCM.es = structure(.Data = SPCM.es, names = sort(as.vector(ge.chm.p)))
+    SPCM.es_lgd = NULL
+    rm(SPCM.es_mat, SPCM.es_lvl, SPCM.es_tempContinuous, SPCM.es_color, SPCM.es_obj)
+  }
+  SPCM.pval = colorRamp2(breaks = c(0, 0.05), colors = c("magenta3", "white"))
+  if (calculateFC == TRUE) {
+    SPCM.breakpoint.fc = min(abs(floor(min(signature_panel.fc))), ceiling(max(signature_panel.fc)))
+    if (length(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))) == 5) {
+      SPCM.fc = colorRamp2(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc), c("limegreen", "white", "white", "white", "orange"))
+    } else {
+      SPCM.fc = colorRamp2(sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), c("limegreen", "white", "orange"))
+    }
+  }
+
+  # set chm_row_names_gp and chm_col_names_gp (show/not show & font size)
+  chm_row_names_gp = dplyr::case_when(
+    nrow(ge.chm.p) <= 70 ~ list(TRUE, 9 - (nrow(ge.chm.p) - 10) / 10),
+    nrow(ge.chm.p) > 70 ~ list(FALSE, 1)
+  )
+
+  chm_col_names_gp = dplyr::case_when(
+    ncol(ge.chm.p) <= 90 ~ list(TRUE, 10 - (ncol(ge.chm.p) - 10) / 10),
+    ncol(ge.chm.p) > 90 ~ list(FALSE, 1)
+  )
+
+  # render complex heatmap
+  chm.sigpan_ge.p = Heatmap(ge.chm.p, name = "Enrichment\n     Score", row_split = split_row, column_split = split_col, col = SPCM.es, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                            row_title_rot = 0,
+                            row_names_rot = 0,
+                            row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                            show_row_names = chm_row_names_gp[[1]][1],
+                            row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                            row_names_side = "right",
+                            cluster_rows = unsupervisedClustering,
+                            cluster_row_slices = unsupervisedClustering,
+                            cluster_columns = unsupervisedClustering,
+                            cluster_column_slices = unsupervisedClustering,
+                            column_title_rot = 0,
+                            column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                            column_names_rot = 45,
+                            column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1]),
+                            column_names_side = "bottom",
+                            top_annotation = NULL,
+                            show_heatmap_legend = colorScheme[["mode"]] == "continuous",
+                            heatmap_legend_param = SPCM.es_lgd)
+
+  chm.sigpan_ge.list = chm.sigpan_ge.p
+
+  if (significanceTest == TRUE) {
+    chm.sigpan_ge.pval = Heatmap(ge.chm.p.pval, name = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), row_split = split_row, column_split = NULL, col = SPCM.pval, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                 row_title_rot = 0,
+                                 row_names_rot = 0,
+                                 row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                 row_names_gp = gpar(fontsize = 3),
+                                 row_names_side = "right",
+                                 show_row_names = FALSE,
+                                 cluster_rows = unsupervisedClustering,
+                                 cluster_row_slices = unsupervisedClustering,
+                                 cluster_columns = FALSE,
+                                 column_title_rot = 0,
+                                 column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                 column_names_rot = 45,
+                                 column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                                 column_names_side = "bottom",
+                                 right_annotation = chm_fdrq,
+                                 heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.pval, at = c(0, 0.05), labels = c("0", "0.05"), title = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), legend_width = unit(1.75, "cm")))
+
+    if (calculateFC == FALSE) {
+      chm.sigpan_ge.list = chm.sigpan_ge.p + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.list[ge.chm.p.pval[, "p-value"] <= 0.05, ]
+    }
+  }
+
+  if (calculateFC == TRUE) {
+    chm.sigpan_ge.fc = Heatmap(signature_panel.fc, name = "Fold-Change\n  log-ratio", row_split = split_row, column_split = NULL, col = SPCM.fc, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                               row_title_rot = 0,
+                               row_names_rot = 0,
+                               row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                               row_names_gp = gpar(fontsize = 3),
+                               row_names_side = "right",
+                               show_row_names = FALSE,
+                               cluster_rows = unsupervisedClustering,
+                               cluster_row_slices = unsupervisedClustering,
+                               cluster_columns = FALSE,
+                               column_title_rot = 0,
+                               column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                               column_names_rot = 45,
+                               column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                               column_names_side = "bottom",
+                               heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.fc, at = sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), labels = sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), title = "Fold-Change\n  log-ratio", legend_width = unit(2, "cm")))
+
+    if (significanceTest == TRUE) {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.fc + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.list[ge.chm.p.pval[, "p-value"] <= 0.05, ]
+    } else {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.fc
+    }
+  }
+
+  # set file name suffix
+  chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm), !is.null(colorScheme[["mode"]])) # always put "filterOutlier" at last, for function complete return message
+  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm), paste0("_", colorScheme[["mode"]]))
+  chm_suffix = ""
+  for (i in 1:length(chm_moduleStatus)) {
+    if (chm_moduleStatus[i] == TRUE) {
+      chm_suffix = paste0(chm_suffix, names(chm_moduleStatus)[i])
+    }
+  }
+  rm(i)
+
+  # set standalone heatmap mainbody legend for discrete mapping
+  if (colorScheme[["mode"]] == "discrete") {
+    SPCM.es_tempContinuous = colorRamp2(c(0, 1), c("white", "royalblue3"))
+    SPCM.es_lgd_discrete = Legend(direction = "vertical", labels = seq(1, 0, -0.2), legend_gp = gpar(fill = SPCM.es_tempContinuous(seq(1, 0, -0.2))), title = "Enrichment\n     Score", legend_height = unit((length(seq(1, 0, -0.2)) * 0.5), "cm"))
+    rm(SPCM.es_tempContinuous)
+  } else {
+    SPCM.es_lgd_discrete = NULL
+  }
+
+  # save complex heatmap file and output matrix file
+  png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_all.png"), width = 3339, height = 2160, units = "px", res = 300)
+  draw(chm.sigpan_ge.list, auto_adjust = FALSE, heatmap_legend_side = "right", heatmap_legend_list = SPCM.es_lgd_discrete)
+  if (any(significanceTest, calculateFC)) {
+    output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[1]]))
+    output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[1]]))
+    output_ge_mat = chm.sigpan_ge.list@ht_list[[1]]@matrix
+  } else {
+    output_row_order = unlist(row_order(chm.sigpan_ge.list))
+    output_col_order = unlist(column_order(chm.sigpan_ge.list))
+    output_ge_mat = chm.sigpan_ge.list@matrix
+  }
+  output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+  write.csv(output_ge_mat, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_all.csv"), quote = FALSE)
+  rm(output_row_order, output_col_order, output_ge_mat)
+  if (significanceTest_fdrq == TRUE) {
+    for (i in 1:length(rowSliceOrder)) {
+      decorate_annotation("NgLog10_FDR", {
+        grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+      }, slice = i)
+      for (j in seq(0, SPCM.breakpoint.fdrq, length.out = 5)) {
+        decorate_annotation("NgLog10_FDR", {
+          grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+        }, slice = i)
+      }
+      rm(j)
+    }
+    rm(i)
+  }
+  dev.off()
+
+  if (significanceTest == TRUE) {
+    tryCatch({
+      png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_sigOnly.png"), width = 3339, height = 2160, units = "px", res = 300)
+      draw(chm.sigpan_ge.list.sig, auto_adjust = FALSE, heatmap_legend_side = "right")
+      output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
+      output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
+      output_ge_mat.sig = chm.sigpan_ge.list.sig@ht_list[[1]]@matrix
+      output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+      write.csv(output_ge_mat.sig, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_sigOnly.csv"), quote = FALSE)
+      rm(output_row_order.sig, output_col_order.sig, output_ge_mat.sig)
+      if (significanceTest_fdrq == TRUE) {
+        if (calculateFC == TRUE) {
+          rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = xcell.foldchange$Cell_Type, to = xcell.foldchange$Exp_Level, warn_missing = FALSE))
+          if (length(rowSliceOrder_sig) > length(rowSliceOrder)) {
+            rowSliceOrder_sig = rowSliceOrder
+          }
+        } else {
+          rowSliceOrder_sig = rowSliceOrder
+        }
+        for (i in 1:length(rowSliceOrder_sig)) {
+          decorate_annotation("NgLog10_FDR", {
+            grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+          }, slice = i)
+          for (j in seq(0, SPCM.breakpoint.fdrq, length.out = 5)) {
+            decorate_annotation("NgLog10_FDR", {
+              grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+            }, slice = i)
+          }
+          rm(j)
+        }
+        rm(i)
+      }
+      dev.off()
+    }, error = function(x) {print("No significant cell types!")})
+  }
+
+  # add boxplot annotation
+  if (addBpAnno == TRUE) {
+
+    # set rowOrder to match heatmap rowOrder
+    if (calculateFC == TRUE) {
+      ge.chm_bpAnno_xaxis_order = as.data.frame(rownames(signature_panel.fc), stringsAsFactors = FALSE)
+    } else {
+      ge.chm_bpAnno_xaxis_order = as.data.frame(rownames(ge.chm.p.pval), stringsAsFactors = FALSE)
+    }
+    colnames(ge.chm_bpAnno_xaxis_order) = "Cell_Type"
+    if (calculateFC == TRUE) {
+      ge.chm_bpAnno_xaxis_order = cbind(ge.chm_bpAnno_xaxis_order, "Exp_Level" = factor(plyr::mapvalues(ge.chm_bpAnno_xaxis_order$Cell_Type, from = xcell.foldchange$Cell_Type, to = xcell.foldchange$Exp_Level, warn_missing = FALSE), levels = rowSliceOrder))
+      ge.chm_bpAnno_xaxis_order = plyr::arrange(ge.chm_bpAnno_xaxis_order, Exp_Level)
+    }
+
+    # set auto-adjusted bottom margin based on main heatmap colnames
+    bpAnno_bottomMargin_ge = max(nchar(colnames(ge.chm.p)))
+    bpAnno_bottomMargin_ge = (bpAnno_bottomMargin_ge * sinpi(45 / 180) * 0.4) * (chm_col_names_gp[[2]] / 9) + (9 - chm_col_names_gp[[2]]) / 10 + 0.05
+    bpAnno_bottomMargin_pval = ifelse(significanceTest == TRUE, nchar("p-value"), 0)
+    bpAnno_bottomMargin_pval = (bpAnno_bottomMargin_pval * sinpi(45 / 180) * 0.4) + 0.05
+    bpAnno_bottomMargin_fc = ifelse(calculateFC == TRUE, nchar("Log10_FC"), 0)
+    bpAnno_bottomMargin_fc = (bpAnno_bottomMargin_fc * sinpi(45 / 180) * 0.4) + 0.05
+    bpAnno_bottomMargin = max(bpAnno_bottomMargin_ge, bpAnno_bottomMargin_pval, bpAnno_bottomMargin_fc)
+
+    # render boxplot annotation
+    ge.chm_bpAnno = ggplot(ge.chm.pmg, aes(x = reorder(Cell.Type, dplyr::desc(factor(Cell.Type, levels = ge.chm_bpAnno_xaxis_order$Cell_Type))), y = Enrichment.Score, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Enrichment Log Ratio", "Enrichment Score")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(2, 0.1, bpAnno_bottomMargin, 0.1), "cm")) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+
+    # save boxplot annotation file
+    png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_xCell", chm_suffix, "_all.png"), width = 720, height = 2160, units = "px", res = 150)
+    print(ge.chm_bpAnno)
+    dev.off()
+
+    # combine chmXcell and boxplot annotation, all
+    v_magick_xCell(outputFolderPath, sigType = "all")
+
+    # render and save boxplot annotation, significant only
+    if (significanceTest == TRUE) {
+      tryCatch({
+        ge.chm_bpAnno_sig = ggplot(ge.chm.pmg.sig, aes(x = reorder(Cell.Type, dplyr::desc(factor(Cell.Type, levels = ge.chm_bpAnno_xaxis_order$Cell_Type))), y = Enrichment.Score, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Enrichment Log Ratio", "Enrichment Score")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(2, 0.1, bpAnno_bottomMargin, 0.1), "cm")) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+        png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_xCell", chm_suffix, "_sigOnly.png"), width = 720, height = 2160, units = "px", res = 150)
+        print(ge.chm_bpAnno_sig)
+        dev.off()
+
+        # combine chmXcell and boxplot annotation, sigOnly
+        v_magick_xCell(outputFolderPath, sigType = "sigOnly")
+      }, error = function(x) {print("No significant cell types!")})
+    }
+  }
+
+  # end of v_chmXcell function
+  chm_returnBlock = ""
+  for (i in 1:length(chm_moduleStatus)) {
+    if (chm_moduleStatus[i] == TRUE) {
+      chm_returnBlock = paste0(chm_returnBlock, toupper(names(chm_moduleStatus)[i]))
+    }
+  }
+  rm(i)
+  print(as.character(glue::glue("v_chmXcell run completed {chm_returnBlock}, output plots and csv files saved in {outputFolderPath}")))
+  return()
+}
+
 # preset globalVariables for R CMD check
-utils::globalVariables(c("GRCm2h38C", "Gene", "Occurrence", "TotalOccurrence", "gdc_ge.list.c_xcell", "gdc_ge.list_FPKM", "iSample", "nSamples", "progressBar", "Cell.Type", "Exp_Level"))
+utils::globalVariables(c("GRCm2h38C", "Gene", "Occurrence", "TotalOccurrence", "gdc_ge.list.c_xcell", "gdc_ge.list_FPKM", "iSample", "nSamples", "progressBar", "Cell.Type", "Exp_Level", "Cell_Type", "Enrichment.Score", "Log10_FC", "TotalOutlier", "aliasID", "assayID_rna", "prepareVdata_xCell_returnList"))

@@ -294,13 +294,10 @@ v_chmFoldChangeLog10_xCell = function(outputFolderPath, log10Threshold, grpName_
     (xcell.foldchange[, 2] < log10Threshold[1]) & (xcell.foldchange[, 2] > log10Threshold[2]) ~ "Within-Threshold"
   )
 
-  # select up- and down-regulated genes
-  xcell.foldchange.udr = subset(xcell.foldchange, subset = Exp_Level != "Within-Threshold")
-
   # write xcell.foldchange to csv file
   write.csv(xcell.foldchange, file = paste0(outputFolderPath, studyID, "_xCell_foldchange_3ExprLvls.csv"), quote = FALSE, row.names = FALSE)
 
-  # end of chmFoldChangeLog10 function
+  # end of v_chmFoldChangeLog10_xCell function
   print(as.character(glue::glue("v_chmFoldChangeLog10_xCell completed, output csv file saved in {outputFolderPath}")))
   return(xcell.foldchange)
 }

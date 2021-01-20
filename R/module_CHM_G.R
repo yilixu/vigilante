@@ -155,5 +155,136 @@ v_prepareVdata_CHM_G = function(doGE = FALSE) {
   return(temp_prepareVdata_CHM_G_returnList)
 }
 
+
+
+#' Calculate log10 fold-change value for module CHM_G/T (both Gene and Transcript)
+#'
+#' (Internal) Helper function, used to calculate log10 fold-change value for module CHM_G/T (both Gene and Transcript), should be called within the respective main function (v_chmSignaturePanel for Gene and v_chmTranscript for Transcript).
+#'
+#' @keywords internal
+
+# v_chmFoldChangeLog10 function
+v_chmFoldChangeLog10 = function(outputFolderPath, log10Threshold, grpName_fc, TPM2RHKG, filterNoTPM) {
+
+  # get variables from parent function
+  studyID = get("studyID", envir = parent.frame())
+  grp.list = get("grp.list", envir = parent.frame())
+  if (speciesID == "hg38") {
+    GRCh38G = get("GRCh38G", envir = parent.frame())
+  } else if (speciesID == "hg19") {
+    GRCh37G = get("GRCh37G", envir = parent.frame())
+  } else {
+    GRCm38G = get("GRCm38G", envir = parent.frame()) # used for mouse
+  }
+
+  # set subgroup for fold change
+  grp.list.fc = grp.list[names(grp.list) %in% grpName_fc]
+
+  # temporarily turn te.list into ge.list for downstream calculation
+  if (TPM2RHKG == "FPKM") {
+    ge.list = get("te.list", envir = parent.frame())
+    ge.list = lapply(ge.list, function(x) x = x[, c(1, 3)])
+  } else {
+    ge.list = get("ge.list", envir = parent.frame())
+  }
+
+  # group up and calculate average TPM
+  ge.grp = list()
+  for (i in 1:length(grpName_fc)) {
+    ge.grp[[i]] = ge.list[names(ge.list) %in% grp.list.fc[[i]]]
+  }
+  rm(i)
+  names(ge.grp) = names(grp.list.fc)
+  ge.grp.avg = list()
+  ge.grp.avg = lapply(ge.grp, dplyr::bind_rows)
+  ge.grp.avg = lapply(ge.grp.avg, function(x) {
+    if (TPM2RHKG != "FPKM") {
+      x = dplyr::group_by(x, ENSG)
+      if (TPM2RHKG == TRUE) {
+        x = dplyr::summarise(x, TPM_avg = mean(RHKG))
+      } else {
+        x = dplyr::summarise(x, TPM_avg = mean(TPM))
+      }
+    } else if (TPM2RHKG == "FPKM") {
+      x = dplyr::group_by(x, Transcript)
+      x = dplyr::summarise(x, TPM_avg = mean(TPM))
+    }
+    x = as.data.frame(x)
+  })
+
+  # replace NA and negative value with 0
+  ge.foldchange = lapply(ge.grp.avg, function(x) {
+    x[is.na(x[, 2]), 2] = 0
+    x[x[, 2] < 0, 2] = 0
+    return(x)
+  })
+
+  # filter out genes with TPM = 0 in both groups
+  if (filterNoTPM == TRUE) {
+    ge.foldchange = lapply(ge.foldchange, function(x) {
+      noTPM = (ge.foldchange[[1]][, 2] == 0) & (ge.foldchange[[2]][, 2] == 0)
+      x = x[!noTPM, ]
+    })
+  }
+
+  # add 10e-5 to fix log(0) issue
+  min0offset_fc = min(sapply(ge.foldchange, function(x) {min(x[x[, 2] > 0, 2])})) / 10
+  min0offset_fc = 10 ^ (floor(log10(min0offset_fc)))
+  ge.foldchange = lapply(ge.foldchange, function(x) {
+    if (TPM2RHKG == TRUE) {
+      x[, 2] = x[, 2] + min0offset_fc # add 10e-3 to fix log(0) issue
+    } else {
+      x[, 2] = x[, 2] + min0offset_fc # add 10e-5 to fix log(0) issue
+    }
+    return(x)
+  })
+
+  # calculate fold change
+  ge.foldchange[[3]] = ge.foldchange[[grpName_fc[2]]]
+  ge.foldchange[[3]][, 2] = log10(ge.foldchange[[3]][, 2] / ge.foldchange[[grpName_fc[1]]][, 2])
+  ge.foldchange = ge.foldchange[[3]]
+  colnames(ge.foldchange) = c(ifelse(TPM2RHKG == "FPKM", "Transcript", "ENSG"), "Log10_FC")
+
+  # classify fold change based on threshold
+  ge.foldchange["Exp_Level"] = dplyr::case_when(
+    ge.foldchange[, 2] >= log10Threshold[1] ~ "Up-Regulated",
+    ge.foldchange[, 2] <= log10Threshold[2] ~ "Down-Regulated",
+    (ge.foldchange[, 2] < log10Threshold[1]) & (ge.foldchange[, 2] > log10Threshold[2]) ~ "Within-Threshold"
+  )
+
+  # below only used for GE
+  if (TPM2RHKG != "FPKM") {
+    # map fold change data to ENSG reference
+    if (speciesID == "hg38") {
+      ge.foldchange = dplyr::inner_join(ge.foldchange, GRCh38G, by = "ENSG")
+      ge.foldchange = ge.foldchange[, c(1, 4, 3, 2)]
+    } else if (speciesID == "hg19") {
+      ge.foldchange = dplyr::inner_join(ge.foldchange, GRCh37G, by = "ENSG")
+      ge.foldchange = ge.foldchange[, c(1, 4, 3, 2)]
+    } else {
+      ge.foldchange = dplyr::inner_join(ge.foldchange, GRCm38G, by = "ENSG")
+      ge.foldchange = ge.foldchange[, c(1, 4, 3, 2)] # used for mouse
+    }
+
+    # write ge.foldchange to csv file (for potential IPA input)
+    tempCSV = ge.foldchange
+    colnames(tempCSV) = c("ENSEMBL_ID", "Gene", "Expression_Level", "Log10_FC")
+    write.csv(tempCSV, file = paste0(outputFolderPath, studyID, "_CHM_G_foldchange_3ExprLvls.csv"), quote = FALSE, row.names = FALSE)
+    rm(tempCSV)
+  }
+
+  # end of v_chmFoldChangeLog10 function
+  if (TPM2RHKG == "FPKM") {
+    k_fc = get("k", envir = parent.frame())
+    te.list.c = get("te.list.c", envir = parent.frame())
+    names_fc = names(te.list.c[k_fc])
+    print(as.character(glue::glue("v_chmFoldChangeLog10 for TE completed, of {names_fc}")))
+    rm(k_fc, names_fc)
+  } else {
+    print(as.character(glue::glue("v_chmFoldChangeLog10 for GE completed, output csv file saved in {outputFolderPath}")))
+  }
+  return(ge.foldchange)
+}
+
 # preset globalVariables for R CMD check
-utils::globalVariables(c("gdc_ge.list.c_chm"))
+utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript"))

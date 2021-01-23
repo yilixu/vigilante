@@ -43,7 +43,8 @@ Imports:
     grid,
     devtools,
     vigilante.knights.sword (>= 0.0.0.9002),
-    magick
+    magick,
+    scales
 Depends: 
     R (>= 2.10)
 Remotes: 

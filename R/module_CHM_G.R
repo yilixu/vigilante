@@ -157,7 +157,7 @@ v_prepareVdata_CHM_G = function(doGE = FALSE) {
 
 
 
-#' Calculate log10 fold-change value for module CHM_G/T (both Gene and Transcript)
+#' Calculate log10 fold-change value for module: CHM_G/T (both Gene and Transcript)
 #'
 #' (Internal) Helper function, used to calculate log10 fold-change value for module CHM_G/T (both Gene and Transcript), should be called within the respective main function (v_chmSignaturePanel for Gene and v_chmTranscript for Transcript).
 #'
@@ -285,6 +285,17 @@ v_chmFoldChangeLog10 = function(outputFolderPath, log10Threshold, grpName_fc, TP
   }
   return(ge.foldchange)
 }
+
+
+
+#' Calculate risk score for module: CHM_G (Gene)
+#'
+#' (Internal) Helper function, used to calcualte risk score for module CHM_G (Gene), should be called within the main function (v_chmSignaturePanel). Please note that currently the risk score calculation method is under revision and in preparation for a peer-reviewed publication. In order to keep up with the standard of vigilante, risk score calculation section in module CHM_G will be temporarily deactivated and will be reactivated once the related publication goes alive.
+#'
+#' @keywords internal
+
+# v_chmRiskScore function
+v_chmRiskScore = function() {}
 
 # preset globalVariables for R CMD check
 utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript"))

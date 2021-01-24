@@ -2,7 +2,7 @@
 % Please edit documentation in R/module_xCell.R
 \name{v_chmFoldChangeLog10_xCell}
 \alias{v_chmFoldChangeLog10_xCell}
-\title{Calculate log10 fold-change value for module xCell}
+\title{Calculate log10 fold-change value for module: xCell}
 \usage{
 v_chmFoldChangeLog10_xCell(
   outputFolderPath,

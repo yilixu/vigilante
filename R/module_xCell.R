@@ -231,7 +231,7 @@ v_prepareVdata_xCell = function(doGE = FALSE, doLocalAnalysis = FALSE, colSliceO
 
 
 
-#' Calculate log10 fold-change value for module xCell
+#' Calculate log10 fold-change value for module: xCell
 #'
 #' (Internal) Helper function, used to calculate log10 fold-change value for module xCell, should be called within the main function (v_chmXcell).
 #'
@@ -304,7 +304,7 @@ v_chmFoldChangeLog10_xCell = function(outputFolderPath, log10Threshold, grpName_
 
 
 
-#' Combine the main body and side annotation of heatmap for module xCell
+#' Combine the main body and side annotation of heatmap for module: xCell
 #'
 #' (Internal) Helper function, used to combine the main body and side annotation of heatmap for module xCell, should be called within the main function (v_chmXcell).
 #'

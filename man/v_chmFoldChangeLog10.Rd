@@ -2,7 +2,7 @@
 % Please edit documentation in R/module_CHM_G.R
 \name{v_chmFoldChangeLog10}
 \alias{v_chmFoldChangeLog10}
-\title{Calculate log10 fold-change value for module CHM_G/T (both Gene and Transcript)}
+\title{Calculate log10 fold-change value for module: CHM_G/T (both Gene and Transcript)}
 \usage{
 v_chmFoldChangeLog10(
   outputFolderPath,

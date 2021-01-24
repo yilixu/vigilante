@@ -2,7 +2,7 @@
 % Please edit documentation in R/module_xCell.R
 \name{v_magick_xCell}
 \alias{v_magick_xCell}
-\title{Combine the main body and side annotation of heatmap for module xCell}
+\title{Combine the main body and side annotation of heatmap for module: xCell}
 \usage{
 v_magick_xCell(outputFolderPath, sigType)
 }

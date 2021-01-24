@@ -297,5 +297,49 @@ v_chmFoldChangeLog10 = function(outputFolderPath, log10Threshold, grpName_fc, TP
 # v_chmRiskScore function
 v_chmRiskScore = function() {}
 
+
+
+#' Convert transcripts per million (TPM) to ratio to housekeeping genes (RHKG) for module: CHM_G (Gene)
+#'
+#' (Internal) Helper function, experimental, used to convert transcripts per million (TPM) to ratio to housekeeping genes (RHKG) for module: CHM_G (Gene), should be called within the main function (v_chmSignaturePanel). The goal behind this method is to provide an altertive measurement of gene expression that can help reduce batch effects and system variance, and make samples across studies more comparable.
+#'
+#' @keywords internal
+
+# v_chmTPM2RHKG function
+v_chmTPM2RHKG = function() {
+
+  # get variables from parent function
+  ge.list = get("ge.list", envir = parent.frame())
+
+  # load housekeeping genes reference
+  hkg_reference = vigilante.knights.sword::hkg_reference
+
+  # extract ge.list.hkg from ge.list
+  ge.list.hkg = lapply(ge.list, merge, x = hkg_reference, by = "ENSG")
+  ge.list.hkg = lapply(ge.list.hkg, function(x) x[, c("ENSG", "TPM")])
+
+  # extract interquartile (Q1 & Q3) portion of HKG TPM per sample
+  ge.list.hkg = lapply(ge.list.hkg, function(x) {
+    q1 = quantile(x[, 2], 0.25, names = FALSE)
+    q3 = quantile(x[, 2], 0.75, names = FALSE)
+    withinIQ = (x[, 2] >= q1 & x[, 2] <= q3)
+    x = x[withinIQ, ]
+    return(x)
+  })
+
+  # convert TPM in ge.list to RHKG based on ge.lsit.hkg
+  ge.list = mapply(x = ge.list, y = ge.list.hkg, SIMPLIFY = FALSE, function(x, y) {
+    IQavgTPMhkg = mean(y[, 2])
+    x["RHKG"] = x["TPM"] / IQavgTPMhkg
+    x["TPM"] = NULL
+    return(x)
+  })
+  rm(ge.list.hkg)
+
+  # end of v_chmTPM2RHKG function
+  print("v_chmTPM2RHKG completed")
+  return(ge.list)
+}
+
 # preset globalVariables for R CMD check
 utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript"))

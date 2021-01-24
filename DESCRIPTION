@@ -42,7 +42,7 @@ Imports:
     graphics,
     grid,
     devtools,
-    vigilante.knights.sword (>= 0.0.0.9002),
+    vigilante.knights.sword (>= 0.0.0.9004),
     magick,
     scales
 Depends: 

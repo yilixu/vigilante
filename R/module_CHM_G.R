@@ -341,5 +341,47 @@ v_chmTPM2RHKG = function() {
   return(ge.list)
 }
 
+
+
+#' Combine the main body and side annotation of heatmap for module: CHM_G/T (both Gene and Transcript)
+#'
+#' (Internal) Helper function, used to combine the main body and side annotation of heatmap for module CHM_G/T (both Gene and Transcript), should be called within the respective main function (v_chmSignaturePanel for Gene and v_chmTranscript for Transcript).
+#'
+#' @keywords internal
+
+# v_magick_chm function
+v_magick_chm = function(outputFolderPath, signaturePanelType, sigType, moduleType) {
+
+  # get variables from parent function
+  studyID = get("studyID", envir = parent.frame())
+  chm_suffix = get("chm_suffix", envir = parent.frame())
+  if (moduleType == "Transcript") {
+    te.list.c = get("te.list.c", envir = parent.frame())
+    k = get("k", envir = parent.frame())
+  }
+
+  # load plots to be combined, based on moduleType
+  if (moduleType == "Gene") {
+    chm_mainbody = image_read(path = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_", sigType, ".png"))
+    chm_bpanno = image_read(path = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_", signaturePanelType, "_annotation_SigPan", chm_suffix, "_", sigType, ".png"))
+  } else if (moduleType == "Transcript") {
+    chm_mainbody = image_read(path = paste0(outputFolderPath, "HeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_", sigType, ".png"))
+    chm_bpanno = image_read(path = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_TE", chm_suffix, "_for_", gsub("Gene: ", "", names(te.list.c)[k]), "_", sigType, ".png"))
+  }
+
+  # combine bpanno and mainbody, watch for the order, from left to right
+  chm_combined = image_append(image = c(chm_bpanno, chm_mainbody), stack = FALSE)
+
+  # output combined plot, based on moduleType
+  if (moduleType == "Gene") {
+    image_write(chm_combined, path = paste0(outputFolderPath, "CombinedHeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_", sigType, ".png"))
+  } else if (moduleType == "Transcript") {
+    image_write(chm_combined, path = paste0(outputFolderPath, "CombinedHeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_", sigType, ".png"))
+  }
+
+  # remove temp variables
+  rm(chm_mainbody, chm_bpanno, chm_combined)
+}
+
 # preset globalVariables for R CMD check
 utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript"))

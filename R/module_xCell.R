@@ -178,7 +178,7 @@ v_prepareVdata_xCell = function(doGE = FALSE, doLocalAnalysis = FALSE, colSliceO
 
     # subset ge.xcell.prep to be consistent with downstream colSliceOrder
     if (length(colSliceOrder) != length(grpName)) {
-      print(glue::glue("Group not processed in xCell: {setdiff(grpName, colSliceOrder)}"))
+      print(as.character(glue::glue("Group not processed in xCell: {setdiff(grpName, colSliceOrder)}")))
       colnames_temp = colnames(ge.xcell.prep)
       grp.list.xcell_temp = list()
       for (i in 1:length(grpName)) {
@@ -472,7 +472,7 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
 
   # subset ge.chm and grp.list.xcell for plot purpose only, e.g. use Normal group for background subtraction but don't show this group
   if (length(colSliceOrder) != length(grpName)) {
-    print(glue::glue("Group not shown: {setdiff(grpName, colSliceOrder)}"))
+    print(as.character(glue::glue("Group not shown: {setdiff(grpName, colSliceOrder)}")))
     colnames_temp = colnames(ge.chm)
     grp.list.xcell_temp = grp.list.xcell[names(grp.list.xcell) %in% colSliceOrder]
     groupInfo_temp = subset(groupInfo, subset = Group %in% colSliceOrder)

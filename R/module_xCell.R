@@ -926,6 +926,12 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
     }
   }
 
+  # remove extracted global settings
+  rm(list = names(globalSettings_returnList))
+
+  # remove extracted prepareVdata_xCell_returnList variables
+  rm(list = names(prepareVdata_xCell_returnList))
+
   # end of v_chmXcell function
   chm_returnBlock = ""
   for (i in 1:length(chm_moduleStatus)) {

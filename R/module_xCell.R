@@ -904,7 +904,7 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
     # render boxplot annotation
     ge.chm_bpAnno = ggplot(ge.chm.pmg, aes(x = reorder(Cell.Type, dplyr::desc(factor(Cell.Type, levels = ge.chm_bpAnno_xaxis_order$Cell_Type))), y = Enrichment.Score, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Enrichment Log Ratio", "Enrichment Score")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(2, 0.1, bpAnno_bottomMargin, 0.1), "cm")) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
 
-    # save boxplot annotation file
+    # save boxplot annotation file, all
     png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_xCell", chm_suffix, "_all.png"), width = 720, height = 2160, units = "px", res = 150)
     print(ge.chm_bpAnno)
     dev.off()

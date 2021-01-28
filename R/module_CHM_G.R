@@ -169,6 +169,7 @@ v_chmFoldChangeLog10 = function(outputFolderPath, log10Threshold, grpName_fc, TP
   # get variables from parent function
   studyID = get("studyID", envir = parent.frame())
   grp.list = get("grp.list", envir = parent.frame())
+  speciesID = get("speciesID", envir = parent.frame())
   if (speciesID == "hg38") {
     GRCh38G = get("GRCh38G", envir = parent.frame())
   } else if (speciesID == "hg19") {

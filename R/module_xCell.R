@@ -356,7 +356,7 @@ v_magick_xCell = function(outputFolderPath, sigType) {
 #' @param grpName_fc character vector, two groups selected for fold-change calculation. Order matters, the first group will be used as the denominator, whereas the second as the nominator.
 #' @param grpName_pval character vector, groups selected for significance test if "significanceTest" is set to TRUE. Order does not matter, but number of groups may affect the type of test. If provided, should have at least two groups.
 #' @param addBpAnno logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
-#' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder".
+#' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno".
 #' @param colorScheme list(character, numeric vector), set color scheme for heatmap mainbody, [[1]] mode, choose one from c("continuous", "discrete"); [[2]] breakpoints, should be a numeric vector containing breakpoints ranging from 0 to 1, inclusive; moreover, breakpoints are only used in "discrete" mode, and will be ignored in "continuous" mode. Recommended values are list(mode = "continuous", breakpoints = NULL) and list(mode = "discrete", breakpoints = seq(from = 0, to = 1, by = 0.2)). By default, will use the first recommended value, list(mode = "continuous", breakpoints = NULL).
 #'
 #' @details
@@ -426,7 +426,7 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
   significanceTest_fdrq = significanceTest_fdrq & significanceTest
   shadowGroup[[1]] = shadowGroup[[1]] & (length(unlist(grp.list)) == length(grp.list))
   calculateFC = (calculateFC & length(grpName_fc) == 2) & !shadowGroup[[1]]
-  addBpAnno = addBpAnno & significanceTest
+  addBpAnno = addBpAnno & significanceTest & !unsupervisedClustering
 
   print("----------Updated values: ----------")
   print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno}")))

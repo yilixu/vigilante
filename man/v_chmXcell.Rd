@@ -43,7 +43,7 @@ v_chmXcell(
 
 \item{significanceTest_inputForm}{character, choose one from c("log10", "log2", "raw"), use log10, log2 or raw value to perform significance test. By default will use "raw" for module xCell, and preferably be left unchanged.}
 
-\item{significanceTest_fdrq}{logic, whether to calculate and display false discovery rate q-value, user-set value may be automatically modified due to interplay.}
+\item{significanceTest_fdrq}{logic, whether to calculate and display false discovery rate q-value, user-set value may be automatically modified (with notice) due to interplay.}
 
 \item{shadowGroup}{list(logic, numeric), [[1]] whether to create shadow/virtual group for each individual sample (grpName will be modified based on aliaseID); [[2]] number of shadow groups per sample. "shadowGroup" can only be used when each original group only contains one individual sample; only works for "significanceTest", will disable "calculateFC"; user-set value may be automatically modified (with notice) due to interplay.}
 
@@ -61,7 +61,7 @@ v_chmXcell(
 
 \item{addBpAnno}{logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.}
 
-\item{unsupervisedClustering}{logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder".}
+\item{unsupervisedClustering}{logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno".}
 
 \item{colorScheme}{list(character, numeric vector), set color scheme for heatmap mainbody, [[1]] mode, choose one from c("continuous", "discrete"); [[2]] breakpoints, should be a numeric vector containing breakpoints ranging from 0 to 1, inclusive; moreover, breakpoints are only used in "discrete" mode, and will be ignored in "continuous" mode. Recommended values are list(mode = "continuous", breakpoints = NULL) and list(mode = "discrete", breakpoints = seq(from = 0, to = 1, by = 0.2)). By default, will use the first recommended value, list(mode = "continuous", breakpoints = NULL).}
 }

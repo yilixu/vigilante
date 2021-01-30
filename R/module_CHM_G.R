@@ -384,5 +384,1163 @@ v_magick_chm = function(outputFolderPath, signaturePanelType, sigType, moduleTyp
   rm(chm_mainbody, chm_bpanno, chm_combined)
 }
 
+
+
+#' Main function for module: CHM_G
+#'
+#' Extract, clean and reform NGS data prepared by v_prepareVdata_CHM_G function, and then perform local Signature Panel Analysis in addition to a set of in-house filtering process and other statistical analysis based on user's choice.
+#'
+#' @param outputFolderPath string, relative or absolute path to the output folder, trailing slash "/" required, can be set to NULL (no output file will be written to the file system), default "./_VK/_CHM/" for module CHM_G.
+#' @param ge.list main input, automatically extracted from the prepared data, can (or probably should) be omitted in function call.
+#' @param signaturePanelType character, type of signature panel, can be user-provided, or choose one from c("UndefinedSignature", "IPA", "NCG_oncogene"), default "UndefinedSignature", see Details for more information, user-set value may be automatically modified (with notice) due to interplay.
+#' @param customFileName string, relative or absolute path to the custom signature panel file, can be set to NULL and use vigilante-embedded signature panels, see Details for more information.
+#' @param filterOutlier logic, whether to filter outliers and exclude them from downstream analysis.
+#' @param filterOutlier_fromGroup character vector, if "filterOutlier" is set to TRUE, filter outliers from the selected groups and ignore outliers from other groups. By default will use the internal character vector "grpName" and can be left unchanged.
+#' @param filterStringency numeric, the ratio that outliers can be allowed in each selected group, from 0 to 1, default 0.1 (10\%), calculation will be rounded down to integer. For example, if there are 24 samples in a group and filterStringency is set to 0.1, the number of allowed outliers in this group will be 2. See Details for more information about how "filterOutlier" works.
+#' @param filterNoTPM logic, whether to filter out genes that have expression value = 0 in all samples, preferably TRUE to prevent error in significance test (error: data are essentially constant).
+#' @param significanceTest logic, whether to perform significance test, the type of test will be automatically adjustd based on the input data and other settings (e.g. number of groups).
+#' @param significanceTest_inputForm character, choose one from c("log10", "log2", "raw"), use log10, log2 or raw value to perform significance test. By default will use "log10" for module CHM_G, and preferably be left unchanged.
+#' @param significanceTest_fdrq logic, whether to calculate and display false discovery rate q-value, user-set value may be automatically modified (with notice) due to interplay.
+#' @param shadowGroup list(logic, numeric), [[1]] whether to create shadow/virtual group for each individual sample (grpName will be modified based on aliaseID); [[2]] number of shadow groups per sample. "shadowGroup" can only be used when each original group only contains one individual sample; only works for "significanceTest", will disable "calculateFC"; user-set value may be automatically modified (with notice) due to interplay.
+#' @param calculateFC logic, whether to calculate log10 fold-change value, user-set value may be automatically modified (with notice) due to interplay.
+#' @param log10Threshold numeric vector, upper and lower cutoff points in log10 form for deciding fold-change levels ("Up-Regulated", "With-Threshold", "Down-Regulated"). By default will use c(0.3, -0.3), which equal to the generally accepted fold-change threshold in non-log form (two-fold and half-fold, respectively).
+#' @param rowSliceOrder character vector, the order (from top to bottom) of fold-change levels (if applicable) to be shown on the output plots and files. By default will use c("Up-Regulated", "Within-Threshold", "Down-Regulated") for module CHM_G, and preferably be left unchanged.
+#' @param colSliceOrder character vector, the order (from left to right) of groups to be shown on the output plots and files, should be set to the same value when called from different functions within the same module (e.g., v_prepareVdata_CHM_G and v_chmSignaturePanel). By default will use the internal character vector "grpName" and can be left unchanged. Groups not included in the "colSliceOrder" will also be excluded from the output plots and files (in most cases), and from certain analysis process (depending on the situation).
+#' @param grpName_fc character vector, two groups selected for fold-change calculation. Order matters, the first group will be used as the denominator, whereas the second as the nominator.
+#' @param grpName_pval character vector, groups selected for significance test if "significanceTest" is set to TRUE. Order does not matter, but number of groups may affect the type of test. If provided, should have at least two groups.
+#' @param calculateRS logic, experimental, whether to calculate risk score.
+#' @param calculateRS_ULcap list(turnOn = logic, upper = character, middle = character, lower = character), [[1]] whether to show decision boundary for risk score; [[2-4]] use which group to set upper/lower cap for RS division, middle cap is required for any decision boundary; 'calculateRS_ULcap' can be set to NULL, which has the same effect as setting 'turnOn' to FALSE, see Details for more information about how 'calculateRS' works.
+#' @param resizeColSlicer logic, whether to resize each column slicer shown on the heatmap, very useful when number of samples in different groups vary greatly (e.g. 10 samples in group A, 50 in group B, and 300 in group C). By default, size of each column slicer is proportional to its sample size, and thus user can use 'resizeColSlicer' to custom and balance the layout of all column slicers.
+#' @param resizeColSlicer_width integer vector, should be the same length as the number of column slicers (including additional statistical analysis results columns), and values provided here will be used in relative instead of absolute calculation. For example, there are 3 groups (A/B/C) with 10/50/300 samples in them, respectively. If there are 2 additional statistical analysis results columns, the final column slicers will be 5. Set 'resizeColSlicer_width' to rep(1, 5) will make all of the 5 column slicers the same size, but usually user may want the mainbody to be larger while the sidebar smaller, in this case, 'resizeColSlicer_width' can be set to c(rep(6, 3), rep(1, 2)) so that the 3 groups of the mainbody are in the same size while the additional statistical analysis results are only one-third of the mainbody's size.
+#' @param TPM2RHKG logic or character, experimental; if logic, control whether to convert transcripts per million (TPM) to ratio to housekeeping genes (RHKG) for module CHM_G (Gene), the goal behind this method is to provide an altertive measurement of gene expression that can help reduce batch effects and system variance, and make samples across studies more comparable; should be set to the specific character "FPKM" if used for module CHM_T (Transcript).
+#' @param subtractBG logic, whether to subtract background noice of gene expression, very useful when performing tumor-normal comparison.
+#' @param subtractBG_tar list(by = character vector, from = character vector), 'by' and 'from' should be names of groups to be selected; will use groups in 'by' to calculate background noice and apply the subtraction to groups in 'from'; 'by' and 'from' selection can have overlaps because background noice calculation is performed before applying the subtraction.
+#' @param gridLineStart_baseline numeric, baseline length, default 1; make slight adjustment to this value (e.g. +- 0.02 or more) if the reference baselines in the risk score section are not showing correctly (this might occur when user uses 'resizeColSlicer' to custom the layout).
+#' @param addBpAnno logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
+#' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno".
+#'
+#' @details
+#' Welcome, welcome, here is the main function for module CHM_G, and one of its goal is to help user to identify potential risk factors (signature) at gene level.
+#'
+#' Here is more information about 'signaturePanelType' and 'customFileName'. To begin with, user can provide a csv file through 'customFileName' containing a panel of genes in dataframe format (check vigilante.knights.sword::oncogene_reference for example) if user already has some genes of interest in mind and wants to check how those genes perform.
+#'
+#' Alternatively, user can try the embedded 'NCG_oncogene' signature panel (derived from external public available data) and get an idea of how this function works; moreover, user can also set 'signaturePanelType' to 'IPA' and 'calculateFC' to TRUE to generate potential input file for external Ingenuity Pathway Analysis, which then can be sent back and used as a starting point for customizing and pinning down user's own signature panel.
+#'
+#' Please note that currently there are several in-house signature panels under development or in preparation for peer-reviewed publication, and they will become available to user once they are validated and the related publications go alive.
+#'
+#' As for 'calculateRS', please note that currently the risk score calculation method is under revision and in preparation for a peer-reviewed publication. In order to keep up with the standard of vigilante, risk score calculation section in module CHM_G will be temporarily deactivated and will be reactivated once the related publication goes alive.
+#'
+#' Here is more information about how "filterOutlier" works. To begin with, vigilante takes the generally accepted definition of outliers: observations that lie outside 1.5 * IQR (Inter Quartile Range) of the 25th or 75th quartiles are regarded as outliers.
+#'
+#' Assuming there is a project containing 100 samples which are divided into 3 groups (Group 1: 24, Group 2: 36, Group 3: 40). The data contains 10,000 observations per sample, and vigilante has detected outliers of observation A and B in the following:
+#' Group 1: A 3, B 2;
+#' Group 2: A 0, B 3;
+#' Group 3: A 0, B 4.
+#'
+#' Under default "filterStringency" of 0.1, observation A will be excluded from downstream analysis, because A has 3 outliers in Group 1 which exceeds the number of allowed outliers in this group (24 * 0.1 = 2.4, rounded down to 2), even if there is no outlier of A in Group 2 or 3. On the other hand, though observation B has 2/3/4 outliers in Group 1/2/3, B will still be kept for downstream analysis because these numbers do not exceed the number of allowed outliers in their repective groups.
+#'
+#' Moreover, if "filterStringency" is changed to 0.05, observation B will be excluded from downstream analysis as well; if "filterStringency" is changed to 0.15, observation A will no longer be excluded from downstream analysis.
+#'
+#' Therefore, it is up to the user to decide whether or not to filter outliers, and how much stringency should be imposed on the filtering process.
+#'
+#' @return NULL, when a valid outputFolderPath is provided, analysis results and output plots will be generated and saved in the provided location, otherwise function run will stop and nothing will be written into the file system.
+#'
+#' @export
+#'
+# v_chmSignaturePanel function
+v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.list, signaturePanelType = "UndefinedSignature", customFileName = NULL, filterOutlier = FALSE, filterOutlier_fromGroup = grpName, filterStringency = 0.1, filterNoTPM = FALSE, significanceTest = FALSE, significanceTest_inputForm = "log10", significanceTest_fdrq = FALSE, shadowGroup = list(FALSE, 5), calculateFC = FALSE, log10Threshold = c(0.3, -0.3), rowSliceOrder = unique(signature_panel$Pathway), colSliceOrder = grpName, grpName_fc = grpName, grpName_pval = grpName, calculateRS = FALSE, calculateRS_ULcap = NULL, resizeColSlicer = FALSE, resizeColSlicer_width = NULL, TPM2RHKG = FALSE, subtractBG = FALSE, subtractBG_tar = NULL, gridLineStart_baseline = 1, addBpAnno = FALSE, unsupervisedClustering = FALSE) {
+
+  # check if outputFolderPath is set
+  if (is.null(outputFolderPath)) {
+    print("v_chmSignaturePanel run stopped: based on user's choice, output files and plots will not be generated")
+    stop()
+  } else {
+    print(as.character(glue::glue("Based on user's choice, output files and plots will be generated and saved in {outputFolderPath}")))
+  }
+
+  # check if globalSettings_returnList exists
+  if (!exists("globalSettings_returnList")) {
+    print("globalSettings_returnList not detected, please follow the instruction and run v_globalSettings function before continue")
+    stop()
+  } else {
+    print("globalSettings_returnList detected, start extracting global settings")
+  }
+
+  # extract global settings from return list
+  for (i in 1:length(globalSettings_returnList)) {
+    assign(x = names(globalSettings_returnList)[i], value = globalSettings_returnList[[i]])
+  }
+  rm(i)
+
+  # check if prepareVdata_CHM_G_returnList exists
+  if (!exists("prepareVdata_CHM_G_returnList")) {
+    print("prepareVdata_CHM_G_returnList not detected, please follow the instruction and run v_prepareVdata_CHM_G function before continue")
+    stop()
+  } else {
+    print("prepareVdata_CHM_G_returnList detected, start extracting CHM_G variables")
+  }
+
+  # extract CHM_G variables from return list
+  for (i in 1:length(prepareVdata_CHM_G_returnList)) {
+    assign(x = names(prepareVdata_CHM_G_returnList)[i], value = prepareVdata_CHM_G_returnList[[i]])
+  }
+  rm(i)
+
+  # arguments modifiers, v_chmSignaturePanel
+  print("Checking the values of the following arguments, modifiers may be applied due to interplay. Please check argument description for more information.")
+  print("----------Original values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno} | calculateRS: {calculateRS}")))
+  if (calculateRS == TRUE) {
+    print("Please note that currently the risk score calculation method is under revision and in preparation for a peer-reviewed publication. In order to keep up with the standard of vigilante, risk score calculation section in module CHM_G will be temporarily deactivated and will be reactivated once the related publication goes alive.")
+  }
+
+  significanceTest_fdrq = significanceTest_fdrq & significanceTest
+  shadowGroup[[1]] = shadowGroup[[1]] & (length(unlist(grp.list)) == length(grp.list))
+  calculateFC = (calculateFC & length(grpName_fc) == 2) & !shadowGroup[[1]]
+  addBpAnno = addBpAnno & significanceTest & !unsupervisedClustering
+  calculateRS = FALSE
+  if (signaturePanelType == "UndefinedSignature" & is.null(customFileName)) {
+    print("User-provided signature panel not detected, switching to the embedded 'NCG_oncogene' signature panel; user can also set signaturePanelType to 'IPA' and calculateFC to TRUE to generate potential input file for external Ingenuity Pathway Analysis")
+    signaturePanelType = "NCG_oncogene"
+  }
+
+  print("----------Updated values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno} | calculateRS: {calculateRS}")))
+
+  # extract full gene list from ENSEMBL reference for IPA signature panel
+  if (signaturePanelType == "IPA") {
+    if (speciesID == "hg19") {
+      temp_fullGeneList = vigilante.knights.sword::GRCh37_ref$GRCh37G[, c("ENSG", "Gene")]
+    } else if (speciesID == "hg38") {
+      temp_fullGeneList = vigilante.knights.sword::GRCh38_ref$GRCh38G[, c("ENSG", "Gene")]
+    } else {
+      temp_fullGeneList = vigilante.knights.sword::GRCm38_ref$GRCm38G[, c("ENSG", "Gene")]
+    }
+    temp_fullGeneList["Pathway"] = "Not Annotated"
+  }
+
+  # load signature panel
+  chm_predefinedSignature = c("NCG_oncogene", "IPA")
+  if (signaturePanelType %in% chm_predefinedSignature | is.null(customFileName)) {
+    customFileName = switch(
+      signaturePanelType,
+      NCG_oncogene = vigilante.knights.sword::oncogene_reference,
+      IPA = temp_fullGeneList,
+      default = NULL)
+  }
+  rm(chm_predefinedSignature)
+  if (signaturePanelType == "IPA") {
+    rm(temp_fullGeneList)
+  }
+
+  if (exists("homologeneOutput")) {
+    signature_panel = homologeneOutput
+  } else if (is.data.frame(customFileName)) {
+    signature_panel = customFileName
+  } else {
+    signature_panel = read.csv(customFileName, stringsAsFactors = FALSE)
+  }
+
+  # pre-calculate log10 fold change and generate IPA_signature.csv
+  if (signaturePanelType == "IPA" & calculateFC == TRUE) {
+    ge.foldchange = v_chmFoldChangeLog10(outputFolderPath, log10Threshold, grpName_fc, TPM2RHKG, filterNoTPM)
+  }
+
+  # convert TPM to RHKG
+  if (TPM2RHKG == TRUE) {
+    ge.list = v_chmTPM2RHKG()
+  }
+
+  # unify gene numbers in ge.list in case samples have differnt number of genes
+  ge.unif = dplyr::bind_rows(ge.list)
+  ge.unif["Occurrence"] = 1
+  ge.unif = ge.unif[, -2]
+  ge.unif = ge.unif %>% dplyr::group_by(ENSG) %>% dplyr::summarise(TotalOccurrence = sum(Occurrence))
+  ge.unif = subset(ge.unif, subset = TotalOccurrence == length(ge.list))
+  ge.unif = unlist(ge.unif[, 1])
+  ge.list = lapply(ge.list, function(x) {
+    x = subset(x, subset = ENSG %in% ge.unif)
+    return(x)
+  })
+  rm(ge.unif)
+
+  # subtracting background (TPM avg) to normalize gene expression data
+  if (subtractBG == TRUE) {
+    averaged = c()
+    for (i in subtractBG_tar[["by"]]) {
+      averaged = c(averaged, ge.list[names(ge.list) %in% grp.list[[i]]])
+    }
+    rm(i)
+    averaged = dplyr::bind_rows(averaged)
+    if (TPM2RHKG == TRUE) {
+      averaged = averaged %>% dplyr::group_by(ENSG) %>% dplyr::summarise(RHKG_avg = mean(RHKG)) %>% as.data.frame()
+    } else {
+      averaged = averaged %>% dplyr::group_by(ENSG) %>% dplyr::summarise(TPM_avg = mean(TPM)) %>% as.data.frame()
+    }
+
+    for (i in subtractBG_tar[["from"]]) {
+      ge.list[names(ge.list) %in% grp.list[[i]]] = lapply(ge.list[names(ge.list) %in% grp.list[[i]]], function(x) {
+        normalized = x
+        normalized[, 2] = x[, 2] - averaged[, 2]
+        return(normalized)
+      })
+    }
+    rm(i, averaged)
+  }
+
+  # pick up target gene
+  if (speciesID == "hg38" | speciesID == "hg19") {
+    ge.list.c = lapply(ge.list, merge, x = signature_panel, by = "ENSG")
+    ge.list.c = lapply(ge.list.c, function(x) x[, 2:4])
+  } else {
+    ge.list.c = lapply(ge.list, dplyr::left_join, x = signature_panel, by = "ENSG")
+    ge.list.c = lapply(ge.list.c, function(x) x[, 2:4]) # used for mouse
+  }
+
+  # filter out outlier genes
+  if (filterOutlier == TRUE) {
+    ge.grp = list()
+    for (i in 1:length(grpName)) {
+      ge.grp[[i]] = ge.list.c[names(ge.list.c) %in% grp.list[[i]]]
+    }
+    rm(i)
+    names(ge.grp) = grpName
+
+    # filter outlier from selected group only
+    ge.grp = subset(ge.grp, subset = names(ge.grp) %in% filterOutlier_fromGroup)
+
+    # original filter process
+    ge.grp.iqr = list()
+    ge.grp.iqr = lapply(ge.grp, dplyr::bind_rows)
+    ge.grp.iqr = lapply(ge.grp.iqr, function(x) {
+      x = dplyr::group_by(x, Gene, Pathway)
+      if (TPM2RHKG == TRUE) {
+        x = dplyr::summarise(x, Outlier = length(unlist(boxplot.stats(RHKG)["out"])))
+      } else {
+        x = dplyr::summarise(x, Outlier = length(unlist(boxplot.stats(TPM)["out"])))
+      }
+      x = as.data.frame(x)
+    })
+
+    for (i in 1:length(ge.grp.iqr)) {
+      filterThreshold = floor(length(ge.grp[[i]]) * filterStringency)
+      ge.grp.iqr[[i]][ge.grp.iqr[[i]][, 3] <= filterThreshold, 3] = 0
+    }
+    rm(i, filterThreshold)
+
+    ge.iqr = dplyr::bind_rows(ge.grp.iqr)
+    ge.iqr = ge.iqr %>% dplyr::group_by(Gene, Pathway) %>% dplyr::summarise(TotalOutlier = sum(Outlier))
+    signature_panel.filtered = unlist(subset(ge.iqr, subset = TotalOutlier == 0)[, 1])
+
+    ge.list.c = lapply(ge.list.c, function(x) {
+      x = subset(x, subset = Gene %in% signature_panel.filtered)
+    })
+
+    rm(ge.grp, ge.grp.iqr, ge.iqr, signature_panel.filtered)
+  }
+
+  # grouping and calculate average GE for csv output
+  ge.grp = list()
+  for (i in 1:length(grpName)) {
+    ge.grp[[i]] = ge.list.c[names(ge.list.c) %in% grp.list[[i]]]
+  }
+  rm(i)
+  names(ge.grp) = grpName
+  for (i in length(ge.grp):1) {
+    if (length(ge.grp[[i]]) == 0) {
+      ge.grp[[i]] = NULL
+    }
+  }
+  rm(i)
+  ge.grp.avg = list()
+  ge.grp.avg = lapply(ge.grp, dplyr::bind_rows)
+  ge.grp.avg = lapply(ge.grp.avg, function(x) {
+    x = dplyr::group_by(x, Gene)
+    if (TPM2RHKG == TRUE) {
+      x = dplyr::summarise(x, RHKG = mean(RHKG))
+    } else {
+      x = dplyr::summarise(x, TPM = mean(TPM))
+    }
+    x = as.data.frame(x)
+  })
+  ge.chm.avg = ge.grp.avg[[1]]
+  for (i in 2:length(ge.grp.avg)) {
+    ge.chm.avg = cbind(ge.chm.avg, ge.grp.avg[[i]][, 2])
+  }
+  rm(i)
+  colnames(ge.chm.avg) = c("Gene", names(ge.grp.avg))
+  rm(ge.grp, ge.grp.avg)
+
+  # subset groupInfo and ge.list.c for plot purpose only, e.g. use Normal group for background subtraction but don't show this group
+  if (length(colSliceOrder) != length(grpName)) {
+    print(as.character(glue::glue("Group not shown: {setdiff(grpName, colSliceOrder)}")))
+    groupInfo_temp = subset(groupInfo, subset = Group %in% colSliceOrder)
+    ge.list.c = ge.list.c[names(ge.list.c) %in% groupInfo_temp$assayID]
+    rm(groupInfo_temp)
+  }
+
+  # merge separate dataframes into one and rename TPM columns
+  ge.chm = ge.list.c[[1]]
+  for (i in 2:length(ge.list.c)) {
+    ge.chm = cbind(ge.chm, ge.list.c[[i]][, 3])
+  }
+  rm(i)
+  colnames(ge.chm) = c("Gene", "Pathway", plyr::mapvalues(names(ge.list.c), from = groupInfo$assayID, to = groupInfo$aliasID, warn_missing = FALSE))
+
+  # convert dataframe ge.chm to matrix ge.chm.p, and set ge.chm.pmg
+  ge.chm.p = ge.chm[, -c(1, 2)]
+  ge.chm.p = as.matrix(ge.chm.p)
+  rownames(ge.chm.p) = ge.chm[, 1]
+  ge.chm.p[is.na(ge.chm.p)] = 0 # replace NA with 0
+  ge.chm.p[ge.chm.p < 0] = 0 # replace negative value with 0 (for subtraction-normolized group)
+  if (filterNoTPM == TRUE) {
+    selectedCol = plyr::mapvalues(colnames(ge.chm.p), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE)
+    selectedCol = selectedCol %in% grpName_pval
+    ge.chm.p = ge.chm.p[rowSums(ge.chm.p[, selectedCol], na.rm = TRUE) != 0, ] # filter out genes that have TPM = 0 in grpName_pval group samples to prevent "data are essentially constant" error
+    rm(selectedCol)
+  }
+  min0offset_min = min(ge.chm.p[ge.chm.p > 0]) / 10
+  min0offset_min = 10 ^ (floor(log10(min0offset_min)))
+  min0offset_max = 10 ^ (-ceiling(log10(max(ge.chm.p))))
+  min0offset = min(min0offset_min, min0offset_max)
+  rm(min0offset_min, min0offset_max)
+  if (TPM2RHKG == TRUE) {
+    ge.chm.p = ge.chm.p + min0offset # add 10e-3 to fix log(0) issue
+  } else {
+    ge.chm.p = ge.chm.p + min0offset # add 10e-5 to fix log(0) issue
+  }
+  if (significanceTest_inputForm == "log10") {
+    ge.chm.pm = reshape2::melt(log10(ge.chm.p))
+  } else if (significanceTest_inputForm == "log2") {
+    ge.chm.pm = reshape2::melt(log2(ge.chm.p))
+  } else {
+    ge.chm.pm = reshape2::melt(ge.chm.p)
+  }
+  ge.chm.pmg = ge.chm.pm
+  ge.chm.pmg["Group"] = factor(plyr::mapvalues(ge.chm.pmg[, 2], from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE), levels = colSliceOrder)
+  colnames(ge.chm.pmg) = c("Gene", "Sample.ID", "Expression.Value", "Group")
+  rm(min0offset, ge.chm.pm)
+
+  # reform ge.chm.pmg and set grp.list_shadow
+  if (shadowGroup[[1]] == TRUE) {
+    grpName_pval = groupInfo$aliasID
+    grp.list_shadow = c(rep(list(ge.chm.pmg), times = shadowGroup[[2]]))
+    grp.list_shadow = lapply(grp.list_shadow, function(x) {
+      x$Group = x$Sample.ID
+      return(x)
+    })
+    names(grp.list_shadow) = paste0("shadow_", 1:shadowGroup[[2]])
+    shadow_multiplier = seq(from = 0.5, to = 1.5, length.out = shadowGroup[[2]])
+    for (i in 1:shadowGroup[[2]]) {
+      grp.list_shadow[[i]]$Sample.ID = paste0(grp.list_shadow[[i]]$Sample.ID, "_", names(grp.list_shadow)[i])
+      grp.list_shadow[[i]]$Expression.Value = grp.list_shadow[[i]]$Expression.Value * shadow_multiplier[i]
+    }
+    rm(i)
+    grp.list_shadow = dplyr::bind_rows(grp.list_shadow)
+    ge.chm.pmg = grp.list_shadow
+    rm(grp.list_shadow, shadow_multiplier)
+  } else {
+    ge.chm.pmg = subset(ge.chm.pmg, subset = Group %in% grpName_pval)
+  }
+
+  # convert TPM to log10/2 ratio, ###replace -Inf with -(max rounded)
+  if (significanceTest_inputForm == "log10") {
+    ge.chm.p.log10 = log10(ge.chm.p)
+  } else if (significanceTest_inputForm == "log2") {
+    ge.chm.p.log10 = log2(ge.chm.p)
+  } else {
+    ge.chm.p.log10 = ge.chm.p
+  }
+
+  # pre-calcualte risk score independent of significance test (because significanceTest will alter ge.chm.p.log10)
+  if (calculateRS == TRUE) {
+    ge.chm.p.log10.rs = v_chmRiskScore()
+  }
+
+  # add t-test/anova significance test based number of groups, and prepare data for boxplot annotation
+  if (significanceTest == TRUE) {
+    tempPaired = (length(grpName_pval) == 2) & (sum(assayID_rna %in% grp.list[[grpName_pval[1]]]) == sum(assayID_rna %in% grp.list[[grpName_pval[2]]]))
+    if (shadowGroup[[1]] == TRUE) {
+      tempPaired = TRUE
+    }
+    ge.chm.p.pval = compare_means(Expression.Value ~ Group, data = ge.chm.pmg, method = ifelse(length(grpName_pval) > 2, "anova", "t.test"), group.by = "Gene", paired = tempPaired)
+    tempRownames = ge.chm.p.pval$Gene
+    ge.chm.p.pval = as.matrix(ge.chm.p.pval$p)
+    rownames(ge.chm.p.pval) = tempRownames
+    colnames(ge.chm.p.pval) = "p-value"
+    ge.chm.p.pval.sig = subset(ge.chm.p.pval, subset = ge.chm.p.pval[, 1] <= 0.05)
+    tempRownames_sig = rownames(ge.chm.p.pval.sig)
+    ge.chm.p.log10 = ge.chm.p.log10[rownames(ge.chm.p.log10) %in% tempRownames, ]
+    ge.chm.pmg.sig = subset(ge.chm.pmg, subset = Gene %in% tempRownames_sig)
+
+    # calculate false discovery rate q-value (fdrq)
+    if (significanceTest_fdrq == TRUE) {
+      ge.chm.p.fdrq = qvalue(p = unlist(ge.chm.p.pval[, 1]), pi0 = 1)[["qvalues"]]
+      ge.chm.p.fdrq = as.matrix(ge.chm.p.fdrq)
+      colnames(ge.chm.p.fdrq) = "q-value"
+      ge.chm.p.fdrq.sig = subset(ge.chm.p.fdrq, subset = rownames(ge.chm.p.fdrq) %in% tempRownames_sig)
+    }
+
+    # conduct pair-wise t-test for detailed csv output of ANOVA test
+    if (length(grpName_pval) > 2 & nrow(ge.chm.pmg.sig) > 0 & shadowGroup[[1]] == FALSE) {
+
+      # shuffle the data (add slight randomness to the constant part) to prevent "data are essentially constant" error
+      tempMinVal = min(ge.chm.pmg.sig[, 3])
+      for (i in 1:nrow(ge.chm.pmg.sig)) {
+        if (ge.chm.pmg.sig[i, 3] == tempMinVal) {
+          tempShuffle = runif(1) / 1000
+          ge.chm.pmg.sig[i, 3] = ge.chm.pmg.sig[i, 3] + tempShuffle
+          rm(tempShuffle)
+        }
+      }
+      rm(i, tempMinVal)
+
+      # original pair-wise t-test process
+      ge.chm.p.pval.sig.ttest = compare_means(Expression.Value ~ Group, data = ge.chm.pmg.sig, method = "t.test", group.by = "Gene", paired = tempPaired)
+      ge.chm.p.pval.sig.ttest = ge.chm.p.pval.sig.ttest[, c(1, 3:5, 8)]
+      colnames(ge.chm.p.pval.sig.ttest) = c("Gene", "Group_1", "Group_2", "p-value", "Significance_Level")
+      ge.chm.p.pval.sig.ttest["NOTES"] = ""
+      ge.chm.p.pval.sig.ttest[1, "NOTES"] = "Open this file with a text editor in case Excel-unsupported encoding characters appear."
+      print(as.character(glue::glue("Additional pair-wise t-test completed, output csv file saved in {outputFolderPath}")))
+      write.csv(ge.chm.p.pval.sig.ttest, paste0(outputFolderPath, studyID, "_SignaturePanelGenes_PairWiseTTest_fromAnovaSigOnly.csv"), quote = FALSE, row.names = FALSE, fileEncoding = "UTF-8")
+      rm(ge.chm.p.pval.sig.ttest)
+    }
+
+    # rm temp significance test variables
+    rm(tempRownames, tempRownames_sig, ge.chm.p.pval.sig, tempPaired)
+
+    if (filterOutlier == TRUE) {
+      # further select significant genes for "IPA" pathway only and output to csv file
+      if (signaturePanelType == "IPA") {
+        ge.chm.p.pval.sig = as.data.frame(ge.chm.p.pval[ge.chm.p.pval[, 1] <= 0.05, ])
+        ge.chm.p.pval.sig = cbind(rownames(ge.chm.p.pval.sig), ge.chm.p.pval.sig)
+        colnames(ge.chm.p.pval.sig) = c("Gene", "p-value")
+        ge.chm.p.pval.sig = dplyr::left_join(ge.chm.p.pval.sig, signature_panel, by = "Gene")
+        ge.chm.p.pval.sig = ge.chm.p.pval.sig[, c(3, 1, 4, 2)]
+        print("Additional filtered genes with p-value <= 0.05 for potential IPA input file generated")
+        write.csv(ge.chm.p.pval.sig, file = paste0(outputFolderPath, studyID, "_filtered_genes_for_IPA_pvalue0.05.csv"), quote = FALSE, row.names = FALSE)
+        ge.chm.p.log10 = ge.chm.p.log10[rownames(ge.chm.p.log10) %in% ge.chm.p.pval.sig$Gene, ]
+        ge.chm.p.pval = as.matrix(ge.chm.p.pval[rownames(ge.chm.p.pval) %in% ge.chm.p.pval.sig$Gene, ])
+        colnames(ge.chm.p.pval) = "p-value"
+        rm(ge.chm.p.pval.sig)
+      }
+    }
+  }
+
+  # calculate fold change log10 ratio for gene expression data
+  if (calculateFC == TRUE) {
+    if (signaturePanelType != "IPA") {
+      ge.foldchange = v_chmFoldChangeLog10(outputFolderPath, log10Threshold, grpName_fc, TPM2RHKG, filterNoTPM)
+    }
+    signature_panel.fc = dplyr::inner_join(signature_panel, ge.foldchange, by = "ENSG")
+    signature_panel.fc = signature_panel.fc[, c(2, 6)]
+    colnames(signature_panel.fc)[1] = "Gene"
+    signature_panel.fc = subset(signature_panel.fc, subset = Gene %in% rownames(ge.chm.p.log10))
+    signature_panel.fc = dplyr::arrange(signature_panel.fc, dplyr::desc(Log10_FC))
+    ge.chm.p.log10 = ge.chm.p.log10[signature_panel.fc$Gene, ]
+    if (significanceTest == TRUE) {
+      ge.chm.p.pval = as.matrix(ge.chm.p.pval[signature_panel.fc$Gene, ])
+      colnames(ge.chm.p.pval) = "p-value"
+      if (significanceTest_fdrq == TRUE) {
+        ge.chm.p.fdrq = as.matrix(ge.chm.p.fdrq[signature_panel.fc$Gene, ])
+        colnames(ge.chm.p.fdrq) = "q-value"
+      }
+    }
+    if (filterOutlier == TRUE) {
+      signature_panel.fc = subset(signature_panel.fc, subset = Gene %in% rownames(ge.chm.p.log10))
+    }
+    tempRownames.fc = signature_panel.fc$Gene
+    signature_panel.fc = as.matrix(signature_panel.fc[, -1])
+    rownames(signature_panel.fc) = tempRownames.fc
+    colnames(signature_panel.fc) = "Log10_FC"
+    rm(tempRownames.fc)
+  }
+
+  # output significance test, fold-change and group average GE calculation results to csv file
+  if (any(significanceTest, calculateFC)) {
+    outputCSV_moduleStatus = c(signature_panel.fc = calculateFC, ge.chm.p.pval= significanceTest, ge.chm.p.fdrq = significanceTest_fdrq)
+    tempCSV = ""
+    for (i in 1:length(outputCSV_moduleStatus)) {
+      if (outputCSV_moduleStatus[i] == TRUE) {
+        if (nchar(tempCSV) == 0 ) {
+          tempCSV = paste0(tempCSV, names(outputCSV_moduleStatus)[i])
+        } else {
+          tempCSV = paste0(tempCSV, ", ", names(outputCSV_moduleStatus)[i])
+        }
+      }
+    }
+    rm(i)
+    tempCSV = glue::glue("cbind({tempCSV})")
+    tempCSV = eval(parse(text = tempCSV))
+    rm(outputCSV_moduleStatus)
+
+    tempCSV = as.data.frame(tempCSV, stringAsFactor = FALSE)
+    tempCSV_suffix = c("_FC" = calculateFC, "_pval" = significanceTest, "_fdrq" = significanceTest_fdrq)
+    tempCSV_suffix = tempCSV_suffix[tempCSV_suffix]
+    tempCSV_suffix = names(tempCSV_suffix)
+    tempCSV_suffix = paste0(tempCSV_suffix, collapse = "")
+    tempCSV["Gene"] = rownames(tempCSV)
+    tempCSV = tempCSV[, c("Gene", colnames(tempCSV)[-ncol(tempCSV)])]
+    tempCSV = dplyr::left_join(x = tempCSV, y = ge.chm.avg, by = "Gene")
+    tempCSV["NOTES"] = ""
+    tempCSV[1, "NOTES"] = "Open this file with a text editor in case many false 0 values appear (Excel only supports maximum precision digits of 15)."
+    print(as.character(glue::glue("Local computation and analysis completed, output csv file saved in {outputFolderPath}")))
+    write.csv(tempCSV, file = paste0(outputFolderPath, studyID, "_SignaturePanelGenes", tempCSV_suffix, ".csv"), quote = FALSE, row.names = FALSE, fileEncoding = "UTF-8")
+    rm(tempCSV, tempCSV_suffix, ge.chm.avg)
+  }
+
+  # post-calculate risk score for gene expression data (because significanceTest will alter ge.chm.p.log10)
+  if (calculateRS == TRUE & significanceTest == TRUE) {
+    ge.chm.p.log10.rs.sig = v_chmRiskScore()
+  }
+
+  # reset column order based on groupInfo$aliasID
+  ge.chm.p.log10 = ge.chm.p.log10[, sort(colnames(ge.chm.p.log10))]
+  if (calculateRS == TRUE) {
+    ge.chm.p.log10.rs = ge.chm.p.log10.rs[, sort(colnames(ge.chm.p.log10.rs))]
+    ge.chm.p.log10.rs = t(as.matrix(ge.chm.p.log10.rs))
+    if (significanceTest == TRUE) {
+      ge.chm.p.log10.rs.sig = ge.chm.p.log10.rs.sig[, sort(colnames(ge.chm.p.log10.rs.sig))]
+      ge.chm.p.log10.rs.sig = t(as.matrix(ge.chm.p.log10.rs.sig))
+    }
+  }
+
+  # preset default chm_fdrq annotation for chm.sigpan_ge.pval
+  chm_fdrq = NULL
+
+  # set chm_fdrq annotation for chm.sigpan_ge.pval
+  if (significanceTest == TRUE & significanceTest_fdrq == TRUE) {
+    ge.chm.p.fdrq.nglog10 = -log10(ge.chm.p.fdrq)
+    SPCM.breakpoint.fdrq = ceiling(max(ge.chm.p.fdrq.nglog10))
+    SPCM.breakpoint.fdrq = max(SPCM.breakpoint.fdrq, 2)
+    if (SPCM.breakpoint.fdrq %% 2 != 0) {
+      SPCM.breakpoint.fdrq = SPCM.breakpoint.fdrq + 1
+    }
+    SPCM.fdrq = colorRamp2(breaks = c(0, SPCM.breakpoint.fdrq), colors = c("white", "red3"))
+    chm_fdrq_col = SPCM.fdrq(ge.chm.p.fdrq.nglog10[, 1])
+    if (nrow(ge.chm.pmg.sig) > 0) {
+      ge.chm.p.fdrq.nglog10.sig = -log10(ge.chm.p.fdrq.sig)
+      chm_fdrq_col.sig = SPCM.fdrq(ge.chm.p.fdrq.nglog10.sig[, 1])
+    }
+    chm_fdrq = rowAnnotation(NgLog10_FDR = anno_barplot(ge.chm.p.fdrq.nglog10[, 1], baseline = 0, gp = gpar(fill = chm_fdrq_col, col = chm_fdrq_col), bar_width = 0.66, axis_param = list(at = c(0, SPCM.breakpoint.fdrq * 0.5, SPCM.breakpoint.fdrq, 1.3), labels = as.character(c(0, SPCM.breakpoint.fdrq * 0.5, SPCM.breakpoint.fdrq, "p")), gp = gpar(fontsize = 6), labels_rot = 0, side = "bottom"), ylim = c(0, SPCM.breakpoint.fdrq)), annotation_name_gp = gpar(fontsize = 8, fontface = "bold"), annotation_name_side = "bottom", annotation_name_rot = 0, width = unit(2, "cm"))
+  }
+
+  # preset default chm_rs annotation and RS_ULcap for chm.sigpan_ge.p
+  chm_rs = NULL
+  chm_rs.resize = NULL
+  RS_upperCap = NULL
+  RS_lowerCap = NULL
+  if (significanceTest == TRUE) {
+    chm_rs.sig = NULL
+    chm_rs.resize.sig = NULL
+    RS_upperCap.sig = NULL
+    RS_lowerCap.sig = NULL
+  }
+
+  # reset chm_rs annotation for chm.sigpan_ge.p
+  if (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs)) > 0) {
+    SPCM.breakpoint.rs = max(abs(floor(min(ge.chm.p.log10.rs))), ceiling(max(ge.chm.p.log10.rs)))
+    SPCM.rs = colorRamp2(c(-SPCM.breakpoint.rs, 0, SPCM.breakpoint.rs), c("royalblue3", "white", "red3"))
+    chm_rs_col = SPCM.rs(ge.chm.p.log10.rs[1, ])
+
+    # set middle (required) and upper/lower cap for RS division
+    if (calculateRS_ULcap[["turnOn"]] == TRUE & !is.null(calculateRS_ULcap[["middle"]]) == TRUE) {
+      ge.chm.p.log10.rs_temp = ge.chm.p.log10.rs
+      colnames(ge.chm.p.log10.rs_temp) = plyr::mapvalues(colnames(ge.chm.p.log10.rs_temp), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE)
+      RS_middleCap = subset(ge.chm.p.log10.rs_temp, select = colnames(ge.chm.p.log10.rs_temp) == calculateRS_ULcap[["middle"]])
+      RS_middleCap = as.data.frame(cbind(t(RS_middleCap), 0))
+      rownames(RS_middleCap) = NULL
+      colnames(RS_middleCap) = c("RS", "Status")
+
+      if (!is.null(calculateRS_ULcap[["upper"]]) == TRUE) {
+        RS_upperCap = subset(ge.chm.p.log10.rs_temp, select = colnames(ge.chm.p.log10.rs_temp) == calculateRS_ULcap[["upper"]])
+        RS_upperCap = as.data.frame(cbind(t(RS_upperCap), 1))
+        rownames(RS_upperCap) = NULL
+        colnames(RS_upperCap) = c("RS", "Status")
+        RS_umBoundary = rbind(RS_upperCap, RS_middleCap)
+        RS_umBoundary = glm(Status ~ RS, family = "binomial", data = RS_umBoundary)
+        RS_umBoundary = RS_umBoundary[["coefficients"]]
+        names(RS_umBoundary) = c("Intercept", "Slope")
+        RS_upperCap = -(RS_umBoundary["Intercept"]) / RS_umBoundary["Slope"]
+        names(RS_upperCap) = NULL
+        RS_upperCap_col = SPCM.rs(RS_upperCap)
+        rm(RS_umBoundary)
+      }
+
+      if (!is.null(calculateRS_ULcap[["lower"]]) == TRUE) {
+        RS_lowerCap = subset(ge.chm.p.log10.rs_temp, select = colnames(ge.chm.p.log10.rs_temp) == calculateRS_ULcap[["lower"]])
+        RS_lowerCap = as.data.frame(cbind(t(RS_lowerCap), 1))
+        rownames(RS_lowerCap) = NULL
+        colnames(RS_lowerCap) = c("RS", "Status")
+        RS_lmBoundary = rbind(RS_lowerCap, RS_middleCap)
+        RS_lmBoundary = glm(Status ~ RS, family = "binomial", data = RS_lmBoundary)
+        RS_lmBoundary = RS_lmBoundary[["coefficients"]]
+        names(RS_lmBoundary) = c("Intercept", "Slope")
+        RS_lowerCap = -(RS_lmBoundary["Intercept"]) / RS_lmBoundary["Slope"]
+        names(RS_lowerCap) = NULL
+        RS_lowerCap_col = SPCM.rs(RS_lowerCap)
+        rm(RS_lmBoundary)
+      }
+
+      rm(RS_middleCap)
+    }
+
+    if (significanceTest == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0) {
+      SPCM.breakpoint.rs.sig = max(abs(floor(min(ge.chm.p.log10.rs.sig))), ceiling(max(ge.chm.p.log10.rs.sig)))
+      SPCM.rs.sig = colorRamp2(c(-SPCM.breakpoint.rs.sig, 0, SPCM.breakpoint.rs.sig), c("royalblue3", "white", "red3"))
+      chm_rs_col.sig = SPCM.rs.sig(ge.chm.p.log10.rs.sig[1, ])
+
+      # set middle (required) and upper/lower cap for RS_sig division
+      if (calculateRS_ULcap[["turnOn"]] == TRUE & !is.null(calculateRS_ULcap[["middle"]]) == TRUE) {
+        ge.chm.p.log10.rs.sig_temp = ge.chm.p.log10.rs.sig
+        colnames(ge.chm.p.log10.rs.sig_temp) = plyr::mapvalues(colnames(ge.chm.p.log10.rs.sig_temp), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE)
+        RS_middleCap.sig = subset(ge.chm.p.log10.rs.sig_temp, select = colnames(ge.chm.p.log10.rs.sig_temp) == calculateRS_ULcap[["middle"]])
+        RS_middleCap.sig = as.data.frame(cbind(t(RS_middleCap.sig), 0))
+        rownames(RS_middleCap.sig) = NULL
+        colnames(RS_middleCap.sig) = c("RS", "Status")
+
+        if (!is.null(calculateRS_ULcap[["upper"]]) == TRUE) {
+          RS_upperCap.sig = subset(ge.chm.p.log10.rs.sig_temp, select = colnames(ge.chm.p.log10.rs.sig_temp) == calculateRS_ULcap[["upper"]])
+          RS_upperCap.sig = as.data.frame(cbind(t(RS_upperCap.sig), 1))
+          rownames(RS_upperCap.sig) = NULL
+          colnames(RS_upperCap.sig) = c("RS", "Status")
+          RS_umBoundary.sig = rbind(RS_upperCap.sig, RS_middleCap.sig)
+          RS_umBoundary.sig = glm(Status ~ RS, family = "binomial", data = RS_umBoundary.sig)
+          RS_umBoundary.sig = RS_umBoundary.sig[["coefficients"]]
+          names(RS_umBoundary.sig) = c("Intercept", "Slope")
+          RS_upperCap.sig = -(RS_umBoundary.sig["Intercept"]) / RS_umBoundary.sig["Slope"]
+          names(RS_upperCap.sig) = NULL
+          RS_upperCap_col.sig = SPCM.rs.sig(RS_upperCap.sig)
+          rm(RS_umBoundary.sig)
+        }
+
+        if (!is.null(calculateRS_ULcap[["lower"]]) == TRUE) {
+          RS_lowerCap.sig = subset(ge.chm.p.log10.rs.sig_temp, select = colnames(ge.chm.p.log10.rs.sig_temp) == calculateRS_ULcap[["lower"]])
+          RS_lowerCap.sig = as.data.frame(cbind(t(RS_lowerCap.sig), 1))
+          rownames(RS_lowerCap.sig) = NULL
+          colnames(RS_lowerCap.sig) = c("RS", "Status")
+          RS_lmBoundary.sig = rbind(RS_lowerCap.sig, RS_middleCap.sig)
+          RS_lmBoundary.sig = glm(Status ~ RS, family = "binomial", data = RS_lmBoundary.sig)
+          RS_lmBoundary.sig = RS_lmBoundary.sig[["coefficients"]]
+          names(RS_lmBoundary.sig) = c("Intercept", "Slope")
+          RS_lowerCap.sig = -(RS_lmBoundary.sig["Intercept"]) / RS_lmBoundary.sig["Slope"]
+          names(RS_lowerCap.sig) = NULL
+          RS_lowerCap_col.sig = SPCM.rs.sig(RS_lowerCap.sig)
+          rm(RS_lmBoundary.sig)
+        }
+
+        rm(RS_middleCap.sig)
+      }
+    }
+
+    if (resizeColSlicer == FALSE) {
+      chm_rs = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs[1, ], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col, col = chm_rs_col), bar_width = 0.66, axis_param = list(at = c(-SPCM.breakpoint.rs:SPCM.breakpoint.rs), gp = gpar(fontsize = 50 / length(-SPCM.breakpoint.rs:SPCM.breakpoint.rs))), ylim = c(-SPCM.breakpoint.rs, SPCM.breakpoint.rs)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+      if (significanceTest == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0) {
+        chm_rs.sig = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs.sig[1, ], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col.sig, col = chm_rs_col.sig), bar_width = 0.66, axis_param = list(at = c(-SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig), gp = gpar(fontsize = 50 / length(-SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig))), ylim = c(-SPCM.breakpoint.rs.sig, SPCM.breakpoint.rs.sig)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+      }
+    } else {
+      chm_rs.resize = list()
+      resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10.rs), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[1]
+      chm_rs.resize[[1]] = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs[1, resizeColSlicer_index], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col[resizeColSlicer_index], col = chm_rs_col[resizeColSlicer_index]), bar_width = 0.66, axis_param = list(at = c(-SPCM.breakpoint.rs:SPCM.breakpoint.rs), gp = gpar(fontsize = 50 / length(-SPCM.breakpoint.rs:SPCM.breakpoint.rs))), ylim = c(-SPCM.breakpoint.rs, SPCM.breakpoint.rs)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+      for (i in 2:length(colSliceOrder)) {
+        resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10.rs), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[i]
+        chm_rs.resize[[i]] = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs[1, resizeColSlicer_index], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col[resizeColSlicer_index], col = chm_rs_col[resizeColSlicer_index]), bar_width = 0.66, axis = FALSE, ylim = c(-SPCM.breakpoint.rs, SPCM.breakpoint.rs)), show_annotation_name = FALSE, height = unit(2, "cm"))
+      }
+      rm(i, resizeColSlicer_index)
+      if (significanceTest == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0) {
+        chm_rs.resize.sig = list()
+        resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10.rs.sig), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[1]
+        chm_rs.resize.sig[[1]] = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs.sig[1, resizeColSlicer_index], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col.sig[resizeColSlicer_index], col = chm_rs_col.sig[resizeColSlicer_index]), bar_width = 0.66, axis_param = list(at = c(-SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig), gp = gpar(fontsize = 50 / length(-SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig))), ylim = c(-SPCM.breakpoint.rs.sig, SPCM.breakpoint.rs.sig)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+        for (i in 2:length(colSliceOrder)) {
+          resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10.rs.sig), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[i]
+          chm_rs.resize.sig[[i]] = HeatmapAnnotation(Risk_Score = anno_barplot(ge.chm.p.log10.rs.sig[1, resizeColSlicer_index], baseline = 0, which = "column", gp = gpar(fill = chm_rs_col.sig[resizeColSlicer_index], col = chm_rs_col.sig[resizeColSlicer_index]), bar_width = 0.66, axis = FALSE, ylim = c(-SPCM.breakpoint.rs.sig, SPCM.breakpoint.rs.sig)), show_annotation_name = FALSE, height = unit(2, "cm"))
+        }
+        rm(i, resizeColSlicer_index)
+      }
+    }
+  }
+
+  # set parameter for splitting rows and columns
+  split_row = factor(plyr::mapvalues(rownames(ge.chm.p.log10), from = ge.chm$Gene, to = ge.chm$Pathway, warn_missing = FALSE), levels = rowSliceOrder)
+  temp_groupInfo = plyr::arrange(groupInfo, aliasID)
+  temp_groupInfo = subset(temp_groupInfo, subset = assayID %in% names(ge.list.c))
+  split_col = factor(unlist(temp_groupInfo$Group), levels = colSliceOrder)
+  rm(temp_groupInfo)
+  if (unsupervisedClustering == TRUE) {
+    split_row = NULL
+    rowSliceOrder = "Undefined"
+    split_col = NULL
+  }
+
+  # set color mapping
+  if (significanceTest_inputForm %in% c("log10", "log2")) {
+    SPCM.breakpoint = max(abs(floor(min(ge.chm.p.log10)) - 1), ceiling(max(ge.chm.p.log10)))
+    SPCM.breakpoint = c(-SPCM.breakpoint, SPCM.breakpoint)
+    SPCM.log10 = colorRamp2(c(SPCM.breakpoint[1], 0, SPCM.breakpoint[2]), c("royalblue3", "white", "red3"))
+  } else {
+    SPCM.breakpoint = ceiling(max(ge.chm.p.log10))
+    SPCM.breakpoint = c(SPCM.breakpoint, SPCM.breakpoint)
+    SPCM.log10 = colorRamp2(c(0, SPCM.breakpoint[1]), c("white", "red3"))
+  }
+  SPCM.pval = colorRamp2(breaks = c(0, 0.05), colors = c("magenta3", "white"))
+  if (calculateFC == TRUE) {
+    SPCM.breakpoint.fc = min(abs(floor(min(signature_panel.fc))), ceiling(max(signature_panel.fc)))
+    if (length(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))) == 5) {
+      SPCM.fc = colorRamp2(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc), c("limegreen", "white", "white", "white", "orange"))
+    } else {
+      SPCM.fc = colorRamp2(sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), c("limegreen", "white", "orange"))
+    }
+  }
+
+  # set chm_row_names_gp (show/not show & font size)
+  chm_row_names_gp = dplyr::case_when(
+    nrow(ge.chm.p.log10) <= 50 ~ list(TRUE, 6 - (nrow(ge.chm.p.log10) - 10) / 10),
+    nrow(ge.chm.p.log10) > 50 ~ list(FALSE, 1)
+  )
+
+  # set chm_col_names_gp (show/not show & font size)
+  chm_col_names_gp = dplyr::case_when(
+    ncol(ge.chm.p.log10) <= 90 ~ list(TRUE, 10 - (ncol(ge.chm.p.log10) - 10) / 10, "black"),
+    ncol(ge.chm.p.log10) > 90 ~ list(TRUE, 2, "white")
+  )
+
+  # render complex heatmap
+  if (resizeColSlicer == FALSE) {
+    chm.sigpan_ge.p = Heatmap(ge.chm.p.log10, name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col, col = SPCM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                              row_title_rot = 0,
+                              row_names_rot = 0,
+                              row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                              show_row_names = chm_row_names_gp[[1]][1],
+                              row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                              row_names_side = "right",
+                              cluster_rows = unsupervisedClustering,
+                              cluster_row_slices = unsupervisedClustering,
+                              cluster_columns = unsupervisedClustering,
+                              cluster_column_slices = unsupervisedClustering,
+                              column_title_rot = 0,
+                              column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                              column_names_rot = 45,
+                              show_column_names = chm_col_names_gp[[1]][1],
+                              column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                              column_names_side = "bottom",
+                              top_annotation = chm_rs,
+                              heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(SPCM.breakpoint[1], 0, SPCM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)))
+
+    chm.sigpan_ge.list = chm.sigpan_ge.p
+
+    if (significanceTest == TRUE) {
+      chm.sigpan_ge.p.sig = Heatmap(ge.chm.p.log10, name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col, col = SPCM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                    row_title_rot = 0,
+                                    row_names_rot = 0,
+                                    row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                    show_row_names = chm_row_names_gp[[1]][1],
+                                    row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                                    row_names_side = "right",
+                                    cluster_rows = unsupervisedClustering,
+                                    cluster_row_slices = unsupervisedClustering,
+                                    cluster_columns = unsupervisedClustering,
+                                    cluster_column_slices = unsupervisedClustering,
+                                    column_title_rot = 0,
+                                    column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                    column_names_rot = 45,
+                                    show_column_names = chm_col_names_gp[[1]][1],
+                                    column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                                    column_names_side = "bottom",
+                                    top_annotation = chm_rs.sig,
+                                    heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(SPCM.breakpoint[1], 0, SPCM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)))
+
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.p.sig
+    }
+  } else {
+    chm.sigpan_ge.p.resize = list()
+    for (i in 1:length(colSliceOrder)) {
+      resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[i]
+      chm.sigpan_ge.p.resize[[i]] = Heatmap(ge.chm.p.log10[, resizeColSlicer_index], name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col[resizeColSlicer_index], col = SPCM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                            row_title_rot = 0,
+                                            row_names_rot = 0,
+                                            row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                            show_row_names = chm_row_names_gp[[1]][1],
+                                            row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                                            row_names_side = "right",
+                                            cluster_rows = unsupervisedClustering,
+                                            cluster_row_slices = unsupervisedClustering,
+                                            cluster_columns = unsupervisedClustering,
+                                            cluster_column_slices = unsupervisedClustering,
+                                            column_title_rot = 0,
+                                            column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                            column_names_rot = 45,
+                                            show_column_names = chm_col_names_gp[[1]][1],
+                                            column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                                            column_names_side = "bottom",
+                                            top_annotation = chm_rs.resize[[i]],
+                                            heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(SPCM.breakpoint[1], 0, SPCM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)), width = resizeColSlicer_width[i])
+    }
+    rm(i, resizeColSlicer_index)
+
+    chm.sigpan_ge.list = chm.sigpan_ge.p.resize[[1]]
+    for (i in 2:length(colSliceOrder)) {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.p.resize[[i]]
+    }
+    rm(i, chm.sigpan_ge.p.resize)
+
+    if (significanceTest == TRUE) {
+      chm.sigpan_ge.p.resize.sig = list()
+      for (i in 1:length(colSliceOrder)) {
+        resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p.log10), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[i]
+        chm.sigpan_ge.p.resize.sig[[i]] = Heatmap(ge.chm.p.log10[, resizeColSlicer_index], name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col[resizeColSlicer_index], col = SPCM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                                  row_title_rot = 0,
+                                                  row_names_rot = 0,
+                                                  row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                                  show_row_names = chm_row_names_gp[[1]][1],
+                                                  row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                                                  row_names_side = "right",
+                                                  cluster_rows = unsupervisedClustering,
+                                                  cluster_row_slices = unsupervisedClustering,
+                                                  cluster_columns = unsupervisedClustering,
+                                                  cluster_column_slices = unsupervisedClustering,
+                                                  column_title_rot = 0,
+                                                  column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                                  column_names_rot = 45,
+                                                  show_column_names = chm_col_names_gp[[1]][1],
+                                                  column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                                                  column_names_side = "bottom",
+                                                  top_annotation = chm_rs.resize.sig[[i]],
+                                                  heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(SPCM.breakpoint[1], 0, SPCM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)), width = resizeColSlicer_width[i])
+      }
+      rm(i, resizeColSlicer_index)
+
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.p.resize.sig[[1]]
+      for (i in 2:length(colSliceOrder)) {
+        chm.sigpan_ge.list.sig = chm.sigpan_ge.list.sig + chm.sigpan_ge.p.resize.sig[[i]]
+      }
+      rm(i, chm.sigpan_ge.p.resize.sig)
+    }
+  }
+
+  if (significanceTest == TRUE) {
+    chm.sigpan_ge.pval = Heatmap(ge.chm.p.pval, name = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), row_split = split_row, column_split = NULL, col = SPCM.pval, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                 row_title_rot = 0,
+                                 row_names_rot = 0,
+                                 row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                 row_names_gp = gpar(fontsize = 3),
+                                 row_names_side = "right",
+                                 show_row_names = FALSE,
+                                 cluster_rows = unsupervisedClustering,
+                                 cluster_row_slices = unsupervisedClustering,
+                                 cluster_columns = FALSE,
+                                 column_title_rot = 0,
+                                 column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                 column_names_rot = 45,
+                                 column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                                 column_names_side = "bottom",
+                                 right_annotation = chm_fdrq,
+                                 heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.pval, at = c(0, 0.05), labels = c("0", "0.05"), title = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), legend_width = unit(1.75, "cm")))
+
+    if (calculateFC == FALSE) {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.list.sig + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig.sub = chm.sigpan_ge.list.sig[ge.chm.p.pval[, "p-value"] <= 0.05, ]
+    }
+  }
+
+  if (calculateFC == TRUE) {
+    chm.sigpan_ge.fc = Heatmap(signature_panel.fc, name = "Fold-Change\n   log-ratio", row_split = split_row, column_split = NULL, col = SPCM.fc, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                               row_title_rot = 0,
+                               row_names_rot = 0,
+                               row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                               row_names_gp = gpar(fontsize = 3),
+                               row_names_side = "right",
+                               show_row_names = FALSE,
+                               cluster_rows = unsupervisedClustering,
+                               cluster_row_slices = unsupervisedClustering,
+                               cluster_columns = FALSE,
+                               column_title_rot = 0,
+                               column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                               column_names_rot = 45,
+                               column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                               column_names_side = "bottom",
+                               heatmap_legend_param = list(direction = "horizontal", col_fun = SPCM.fc, at = sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), labels = sort(unique(c(-SPCM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], SPCM.breakpoint.fc))), title = "Fold-Change\n   log-ratio", legend_width = unit(2, "cm")))
+
+    if (significanceTest == TRUE) {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.fc + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig = chm.sigpan_ge.list.sig + chm.sigpan_ge.fc + chm.sigpan_ge.pval
+      chm.sigpan_ge.list.sig.sub = chm.sigpan_ge.list.sig[ge.chm.p.pval[, "p-value"] <= 0.05, ]
+    } else {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.fc
+    }
+  }
+
+  # set file name suffix
+  chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, resizeColSlicer, TPM2RHKG, calculateRS, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm)) # always put "calculateRS" and "filterOutlier" at last, for function complete return message
+  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_Resized", "_RHKG", "_RiskScore", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm))
+  chm_suffix = ""
+  for (i in 1:length(chm_moduleStatus)) {
+    if (chm_moduleStatus[i] == TRUE) {
+      chm_suffix = paste0(chm_suffix, names(chm_moduleStatus)[i])
+    }
+  }
+  rm(i)
+
+  # save complex heatmap file and output matrix file
+  png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_all.png"), width = 3339, height = 2160, units = "px", res = 300)
+  draw(chm.sigpan_ge.list, auto_adjust = resizeColSlicer, heatmap_legend_side = "right")
+  if (resizeColSlicer == FALSE) {
+    if (any(significanceTest, calculateFC)) {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[1]]))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[1]]))
+      output_ge_mat = chm.sigpan_ge.list@ht_list[[1]]@matrix
+    } else {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list))
+      output_ge_mat = chm.sigpan_ge.list@matrix
+    }
+    output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+    rm(output_row_order, output_col_order)
+  } else {
+    output_ge_mat.resize = list()
+    for (i in 1:(length(colSliceOrder))) {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[i]]))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[i]]))
+      output_ge_mat = chm.sigpan_ge.list@ht_list[[i]]@matrix
+      output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+      output_ge_mat.resize[[i]] = output_ge_mat
+    }
+    rm(i, output_row_order, output_col_order, output_ge_mat)
+    output_ge_mat.resize = lapply(output_ge_mat.resize, function(x) {
+      x = as.data.frame(x)
+      return(x)
+    })
+    output_ge_mat = dplyr::bind_cols(output_ge_mat.resize)
+    rownames(output_ge_mat) = rownames(output_ge_mat.resize[[1]])
+    rm(output_ge_mat.resize)
+  }
+  write.csv(output_ge_mat, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_all.csv"), quote = FALSE)
+  rm(output_ge_mat)
+  if (significanceTest_fdrq == TRUE) {
+    for (i in 1:length(rowSliceOrder)) {
+      decorate_annotation("NgLog10_FDR", {
+        grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+      }, slice = i)
+      for (j in seq(0, SPCM.breakpoint.fdrq, length.out = 5)) {
+        decorate_annotation("NgLog10_FDR", {
+          grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+        }, slice = i)
+      }
+      rm(j)
+    }
+    rm(i)
+  }
+  if (calculateRS == TRUE) {
+    if (resizeColSlicer == FALSE) {
+      for (i in 1:length(colSliceOrder)) {
+        decorate_annotation("Risk_Score", {
+          grid.lines(c(0, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+          if (!is.null(RS_upperCap) == TRUE) {
+            grid.lines(c(0, 1), unit(c(RS_upperCap, RS_upperCap), "native"), gp = gpar(lty = 2, col = RS_upperCap_col, lwd = 1.5))
+          }
+          if (!is.null(RS_lowerCap) == TRUE) {
+            grid.lines(c(0, 1), unit(c(RS_lowerCap, RS_lowerCap), "native"), gp = gpar(lty = 2, col = RS_lowerCap_col, lwd = 1.5))
+          }
+        }, slice = i)
+
+        for (j in -SPCM.breakpoint.rs:SPCM.breakpoint.rs) {
+          decorate_annotation("Risk_Score", {
+            grid.lines(c(0, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+          }, slice = i)
+        }
+        rm(j)
+      }
+      rm(i)
+    } else {
+      gridLineStart = -(gridLineStart_baseline / resizeColSlicer_width[length(colSliceOrder)] * sum(resizeColSlicer_width[1:(length(colSliceOrder) - 1)]) + (length(colSliceOrder) * 0.05)) * ((sum(resizeColSlicer_width[1:(length(colSliceOrder) - 1)]) + length(resizeColSlicer_width) - length(colSliceOrder)) / sum(resizeColSlicer_width[1:(length(colSliceOrder) - 1)]))
+      decorate_annotation("Risk_Score", {
+        grid.lines(c(gridLineStart, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+        if (!is.null(RS_upperCap) == TRUE) {
+          grid.lines(c(gridLineStart, 1), unit(c(RS_upperCap, RS_upperCap), "native"), gp = gpar(lty = 2, col = RS_upperCap_col, lwd = 1.5))
+        }
+        if (!is.null(RS_lowerCap) == TRUE) {
+          grid.lines(c(gridLineStart, 1), unit(c(RS_lowerCap, RS_lowerCap), "native"), gp = gpar(lty = 2, col = RS_lowerCap_col, lwd = 1.5))
+        }
+      }, slice = 1)
+
+      for (j in -SPCM.breakpoint.rs:SPCM.breakpoint.rs) {
+        decorate_annotation("Risk_Score", {
+          grid.lines(c(gridLineStart, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+        }, slice = 1)
+      }
+      rm(j)
+    }
+  }
+  dev.off()
+
+  if (significanceTest == TRUE) {
+    tryCatch({
+      png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_sigOnly.png"), width = 3339, height = 2160, units = "px", res = 300)
+      draw(chm.sigpan_ge.list.sig.sub, auto_adjust = resizeColSlicer, heatmap_legend_side = "right")
+      if (resizeColSlicer == FALSE) {
+        output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig.sub@ht_list[[1]]))
+        output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig.sub@ht_list[[1]]))
+        output_ge_mat.sig = chm.sigpan_ge.list.sig.sub@ht_list[[1]]@matrix
+        output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+        rm(output_row_order.sig, output_col_order.sig)
+      } else {
+        output_ge_mat.resize.sig = list()
+        for (i in 1:(length(colSliceOrder))) {
+          output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig.sub@ht_list[[i]]))
+          output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig.sub@ht_list[[i]]))
+          output_ge_mat.sig = chm.sigpan_ge.list.sig.sub@ht_list[[i]]@matrix
+          output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+          output_ge_mat.resize.sig[[i]] = output_ge_mat.sig
+        }
+        rm(i, output_row_order.sig, output_col_order.sig, output_ge_mat.sig)
+        output_ge_mat.resize.sig = lapply(output_ge_mat.resize.sig, function(x) {
+          x = as.data.frame(x)
+          return(x)
+        })
+        output_ge_mat.sig = dplyr::bind_cols(output_ge_mat.resize.sig)
+        rownames(output_ge_mat.sig) = rownames(output_ge_mat.resize.sig[[1]])
+        rm(output_ge_mat.resize.sig)
+      }
+      write.csv(output_ge_mat.sig, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_sigOnly.csv"), quote = FALSE)
+      rm(output_ge_mat.sig)
+      if (significanceTest_fdrq == TRUE) {
+        if (calculateFC == TRUE) {
+          rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = ge.foldchange$Gene, to = ge.foldchange$Exp_Level, warn_missing = FALSE))
+          if (length(rowSliceOrder_sig) > length(rowSliceOrder)) {
+            rowSliceOrder_sig = rowSliceOrder
+          }
+        } else {
+          rowSliceOrder_sig = rowSliceOrder
+        }
+        for (i in 1:length(rowSliceOrder_sig)) {
+          decorate_annotation("NgLog10_FDR", {
+            grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+          }, slice = i)
+          for (j in seq(0, SPCM.breakpoint.fdrq, length.out = 5)) {
+            decorate_annotation("NgLog10_FDR", {
+              grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+            }, slice = i)
+          }
+          rm(j)
+        }
+        rm(i)
+      }
+      if (calculateRS == TRUE) {
+        if (resizeColSlicer == FALSE) {
+          for (i in 1:length(colSliceOrder)) {
+            decorate_annotation("Risk_Score", {
+              grid.lines(c(0, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+              if (!is.null(RS_upperCap.sig) == TRUE) {
+                grid.lines(c(0, 1), unit(c(RS_upperCap.sig, RS_upperCap.sig), "native"), gp = gpar(lty = 2, col = RS_upperCap_col.sig, lwd = 1.5))
+              }
+              if (!is.null(RS_lowerCap.sig) == TRUE) {
+                grid.lines(c(0, 1), unit(c(RS_lowerCap.sig, RS_lowerCap.sig), "native"), gp = gpar(lty = 2, col = RS_lowerCap_col.sig, lwd = 1.5))
+              }
+            }, slice = i)
+            for (j in -SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig) {
+              decorate_annotation("Risk_Score", {
+                grid.lines(c(0, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+              }, slice = i)
+            }
+            rm(j)
+          }
+          rm(i)
+        } else {
+          decorate_annotation("Risk_Score", {
+            grid.lines(c(gridLineStart, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+            if (!is.null(RS_upperCap.sig) == TRUE) {
+              grid.lines(c(gridLineStart, 1), unit(c(RS_upperCap.sig, RS_upperCap.sig), "native"), gp = gpar(lty = 2, col = RS_upperCap_col.sig, lwd = 1.5))
+            }
+            if (!is.null(RS_lowerCap.sig) == TRUE) {
+              grid.lines(c(gridLineStart, 1), unit(c(RS_lowerCap.sig, RS_lowerCap.sig), "native"), gp = gpar(lty = 2, col = RS_lowerCap_col.sig, lwd = 1.5))
+            }
+          }, slice = 1)
+          for (j in -SPCM.breakpoint.rs.sig:SPCM.breakpoint.rs.sig) {
+            decorate_annotation("Risk_Score", {
+              grid.lines(c(gridLineStart, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+            }, slice = 1)
+          }
+          rm(j)
+        }
+      }
+      dev.off()
+    }, error = function(x) {print("No significant genes!")})
+  }
+
+  # add boxplot annotation
+  if (addBpAnno == TRUE) {
+
+    # set rowOrder to match heatmap rowOrder
+    if (calculateFC == TRUE) {
+      ge.chm_bpAnno_xaxis_order = as.data.frame(rownames(signature_panel.fc), stringsAsFactors = FALSE)
+    } else {
+      ge.chm_bpAnno_xaxis_order = as.data.frame(rownames(ge.chm.p.pval), stringsAsFactors = FALSE)
+    }
+    colnames(ge.chm_bpAnno_xaxis_order) = "Gene"
+    ge.chm_bpAnno_xaxis_order = cbind(ge.chm_bpAnno_xaxis_order, "Pathway" = factor(plyr::mapvalues(ge.chm_bpAnno_xaxis_order$Gene, from = signature_panel$Gene, to = signature_panel$Pathway, warn_missing = FALSE), levels = rowSliceOrder))
+    ge.chm_bpAnno_xaxis_order = plyr::arrange(ge.chm_bpAnno_xaxis_order, Pathway)
+
+    # set auto-adjusted bottom margin based on main heatmap colnames
+    bpAnno_bottomMargin_ge = max(nchar(colnames(ge.chm.p.log10)))
+    bpAnno_bottomMargin_ge = (bpAnno_bottomMargin_ge * sinpi(45 / 180) * 0.4) * (chm_col_names_gp[[2]] / 9) + (9 - chm_col_names_gp[[2]]) / 10 + 0.05
+    bpAnno_bottomMargin_pval = ifelse(significanceTest == TRUE, nchar("p-value"), 0)
+    bpAnno_bottomMargin_pval = (bpAnno_bottomMargin_pval * sinpi(45 / 180) * 0.4) + 0.05
+    bpAnno_bottomMargin_fc = ifelse(calculateFC == TRUE, nchar("Log10_FC"), 0)
+    bpAnno_bottomMargin_fc = (bpAnno_bottomMargin_fc * sinpi(45 / 180) * 0.4) + 0.05
+    bpAnno_bottomMargin = max(bpAnno_bottomMargin_ge, bpAnno_bottomMargin_pval, bpAnno_bottomMargin_fc)
+
+    # set auto-adjusted top margin based on calculateRS condition
+    bpAnno_topMargin = ifelse(calculateRS == TRUE, 6.15, 2)
+
+    # set bpAnno_yaxisText_gp (show/not show & font size)
+    bpAnno_yaxisText_gp = dplyr::case_when(
+      nrow(ge.chm.p.log10) <= 100 ~ list("black", 1),
+      nrow(ge.chm.p.log10) <= 200 ~ list("black", 1 - (nrow(ge.chm.p.log10) - 100) / 167),
+      nrow(ge.chm.p.log10) > 200 ~ list("white", 0.1)
+    )
+
+    # render boxplot annotation, all
+    ge.chm_bpAnno = ggplot(ge.chm.pmg, aes(x = reorder(Gene, dplyr::desc(factor(Gene, levels = ge.chm_bpAnno_xaxis_order$Gene))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin, 0.1, bpAnno_bottomMargin, 0.1), "cm"), axis.text.y = element_text(color = bpAnno_yaxisText_gp[[1]][1], size = rel(bpAnno_yaxisText_gp[[2]][1]))) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+
+    # save boxplot annotation file, all
+    png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_", signaturePanelType, "_annotation_SigPan", chm_suffix, "_all.png"), width = 720, height = 2160, units = "px", res = 150)
+    print(ge.chm_bpAnno)
+    dev.off()
+
+    # combine chmSignaturePanel and boxplot annotation, all
+    v_magick_chm(outputFolderPath, signaturePanelType, sigType = "all", moduleType = "Gene")
+
+    # render and save boxplot annotation, significant only
+    if (significanceTest == TRUE) {
+      tryCatch({
+        ge.chm_bpAnno_sig = ggplot(ge.chm.pmg.sig, aes(x = reorder(Gene, dplyr::desc(factor(Gene, levels = ge.chm_bpAnno_xaxis_order$Gene))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin, 0.1, bpAnno_bottomMargin, 0.1), "cm"), axis.text.y = element_text(color = bpAnno_yaxisText_gp[[1]][1], size = rel(bpAnno_yaxisText_gp[[2]][1]))) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+        png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_", signaturePanelType, "_annotation_SigPan", chm_suffix, "_sigOnly.png"), width = 720, height = 2160, units = "px", res = 150)
+        print(ge.chm_bpAnno_sig)
+        dev.off()
+
+        # combine chmSignaturePanel and boxplot annotation, sigOnly
+        v_magick_chm(outputFolderPath, signaturePanelType, sigType = "sigOnly", moduleType = "Gene")
+      }, error = function(x) {print("No significant cell types!")})
+    }
+  }
+
+  # remove extracted global settings
+  rm(list = names(globalSettings_returnList))
+
+  # remove extracted prepareVdata_CHM_G_returnList variables
+  rm(list = names(prepareVdata_CHM_G_returnList))
+
+  # end of v_chmSignaturePanel function
+  chm_returnBlock = ""
+  for (i in 1:length(chm_moduleStatus)) {
+    if (chm_moduleStatus[i] == TRUE) {
+      chm_returnBlock = paste0(chm_returnBlock, toupper(names(chm_moduleStatus)[i]))
+    }
+  }
+  rm(i)
+  print(as.character(glue::glue("v_chmSignaturePanel of ({signaturePanelType}) completed {chm_returnBlock}, output plots and csv files saved in {outputFolderPath}")))
+  return()
+}
+
 # preset globalVariables for R CMD check
-utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript"))
+utils::globalVariables(c("gdc_ge.list.c_chm", "RHKG", "Transcript", "Expression.Value", "Outlier", "Pathway", "homologeneOutput", "prepareVdata_CHM_G_returnList"))

@@ -386,7 +386,7 @@ v_magick_chm = function(outputFolderPath, signaturePanelType, sigType, moduleTyp
 
 
 
-#' Main function for module: CHM_G
+#' Main function for module: CHM_G (Gene)
 #'
 #' Extract, clean and reform NGS data prepared by v_prepareVdata_CHM_G function, and then perform local Signature Panel Analysis in addition to a set of in-house filtering process and other statistical analysis based on user's choice.
 #'

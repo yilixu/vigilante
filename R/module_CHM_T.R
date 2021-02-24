@@ -270,5 +270,787 @@ v_prepareVdata_CHM_T = function(doTE = FALSE, customFileName_selection = NULL, s
   return(temp_prepareVdata_CHM_T_returnList)
 }
 
+
+
+#' Main function for module: CHM_T (Transcript)
+#'
+#' Extract, clean and reform NGS data prepared by v_prepareVdata_CHM_T function, and then perform local Transcript/Variant/Isoform Analysis in addition to a set of in-house filtering process and other statistical analysis based on user's choice.
+#'
+#' @param outputFolderPath string, relative or absolute path to the output folder, trailing slash "/" required, can be set to NULL (no output file will be written to the file system), default "./_VK/_CHM/" for module CHM_T.
+#' @param te.list.c main input, automatically extracted from the prepared data, can (or probably should) be omitted in function call.
+#' @param filterOutlier logic, whether to filter outliers and exclude them from downstream analysis.
+#' @param filterOutlier_fromGroup character vector, if "filterOutlier" is set to TRUE, filter outliers from the selected groups and ignore outliers from other groups. By default will use the internal character vector "grpName" and can be left unchanged.
+#' @param filterStringency numeric, the ratio that outliers can be allowed in each selected group, from 0 to 1, default 0.1 (10\%), calculation will be rounded down to integer. For example, if there are 24 samples in a group and filterStringency is set to 0.1, the number of allowed outliers in this group will be 2. See Details for more information about how "filterOutlier" works.
+#' @param filterNoTPM logic, whether to filter out genes that have expression value = 0 in all samples, preferably TRUE to prevent error in significance test (error: data are essentially constant).
+#' @param significanceTest logic, whether to perform significance test, the type of test will be automatically adjustd based on the input data and other settings (e.g. number of groups).
+#' @param significanceTest_inputForm character, choose one from c("log10", "log2", "raw"), use log10, log2 or raw value to perform significance test. By default will use "log10" for module CHM_G, and preferably be left unchanged.
+#' @param significanceTest_fdrq logic, whether to calculate and display false discovery rate q-value, user-set value may be automatically modified (with notice) due to interplay.
+#' @param shadowGroup list(logic, numeric), [[1]] whether to create shadow/virtual group for each individual sample (grpName will be modified based on aliaseID); [[2]] number of shadow groups per sample. "shadowGroup" can only be used when each original group only contains one individual sample; only works for "significanceTest", will disable "calculateFC"; user-set value may be automatically modified (with notice) due to interplay.
+#' @param calculateFC logic, whether to calculate log10 fold-change value, user-set value may be automatically modified (with notice) due to interplay.
+#' @param log10Threshold numeric vector, upper and lower cutoff points in log10 form for deciding fold-change levels ("Up-Regulated", "With-Threshold", "Down-Regulated"). By default will use c(0.3, -0.3), which equal to the generally accepted fold-change threshold in non-log form (two-fold and half-fold, respectively).
+#' @param rowSliceOrder character vector, the order (from top to bottom) of genes (associated with transcripts) to be shown on the output plots and files. By default will use the internal character vector "te_loader_par[["te_rowSlice"]]" for module CHM_T, and preferably be left unchanged.
+#' @param colSliceOrder character vector, the order (from left to right) of groups to be shown on the output plots and files, should be set to the same value when called from different functions within the same module (e.g., v_prepareVdata_CHM_G and v_chmSignaturePanel). By default will use the internal character vector "grpName" and can be left unchanged. Groups not included in the "colSliceOrder" will also be excluded from the output plots and files (in most cases), and from certain analysis process (depending on the situation).
+#' @param grpName_fc character vector, two groups selected for fold-change calculation. Order matters, the first group will be used as the denominator, whereas the second as the nominator.
+#' @param grpName_pval character vector, groups selected for significance test if "significanceTest" is set to TRUE. Order does not matter, but number of groups may affect the type of test. If provided, should have at least two groups.
+#' @param sortRowByEV logic, whether to sort row (from top to bottom, within each row slice) by Expression Value (from high to low); currently not implemented.
+#' @param sortColByEV logic, whether to sort column (from left to right, within each column slice) by Expression Value (from high to low); currently not implemented.
+#' @param addBpAnno logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
+#' @param addEvAnno logic, whether to add barplot annotation (Expression Value) to the top of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
+#' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno" and "addEvAnno".
+#' @param showCOMBIonly logic, whether to perform transcript analysis and show results for (all genes combined only) or (separate the analysis and results by each individual gene).
+#'
+#' @details
+#' Here is more information about how "filterOutlier" works. To begin with, vigilante takes the generally accepted definition of outliers: observations that lie outside 1.5 * IQR (Inter Quartile Range) of the 25th or 75th quartiles are regarded as outliers.
+#'
+#' Assuming there is a project containing 100 samples which are divided into 3 groups (Group 1: 24, Group 2: 36, Group 3: 40). The data contains 10,000 observations per sample, and vigilante has detected outliers of observation A and B in the following:
+#' Group 1: A 3, B 2;
+#' Group 2: A 0, B 3;
+#' Group 3: A 0, B 4.
+#'
+#' Under default "filterStringency" of 0.1, observation A will be excluded from downstream analysis, because A has 3 outliers in Group 1 which exceeds the number of allowed outliers in this group (24 * 0.1 = 2.4, rounded down to 2), even if there is no outlier of A in Group 2 or 3. On the other hand, though observation B has 2/3/4 outliers in Group 1/2/3, B will still be kept for downstream analysis because these numbers do not exceed the number of allowed outliers in their repective groups.
+#'
+#' Moreover, if "filterStringency" is changed to 0.05, observation B will be excluded from downstream analysis as well; if "filterStringency" is changed to 0.15, observation A will no longer be excluded from downstream analysis.
+#'
+#' Therefore, it is up to the user to decide whether or not to filter outliers, and how much stringency should be imposed on the filtering process.
+#'
+#' @return NULL, when a valid outputFolderPath is provided, analysis results and output plots will be generated and saved in the provided location, otherwise function run will stop and nothing will be written into the file system.
+#'
+#' @export
+#'
+# v_chmTranscript function
+v_chmTranscript = function(outputFolderPath = "./_VK/_CHM/", te.list.c = te.list.c, filterOutlier = FALSE, filterOutlier_fromGroup = grpName, filterStringency = 0.1, filterNoTPM = FALSE, significanceTest = FALSE, significanceTest_inputForm = "log10", significanceTest_fdrq = FALSE, shadowGroup = list(FALSE, 5), calculateFC = FALSE, log10Threshold = c(0.3, -0.3), rowSliceOrder = te_loader_par[["te_rowSlice"]], colSliceOrder = grpName, grpName_fc = grpName, grpName_pval = grpName, sortRowByEV = FALSE, sortColByEV = FALSE, addBpAnno = FALSE, addEvAnno = FALSE, unsupervisedClustering = FALSE, showCOMBIonly = TRUE) {
+
+  # check if outputFolderPath is set
+  if (is.null(outputFolderPath)) {
+    print("v_chmSignaturePanel run stopped: based on user's choice, output files and plots will not be generated")
+    stop()
+  } else {
+    print(as.character(glue::glue("Based on user's choice, output files and plots will be generated and saved in {outputFolderPath}")))
+  }
+
+  # check if globalSettings_returnList exists
+  if (!exists("globalSettings_returnList")) {
+    print("globalSettings_returnList not detected, please follow the instruction and run v_globalSettings function before continue")
+    stop()
+  } else {
+    print("globalSettings_returnList detected, start extracting global settings")
+  }
+
+  # extract global settings from return list
+  for (i in 1:length(globalSettings_returnList)) {
+    assign(x = names(globalSettings_returnList)[i], value = globalSettings_returnList[[i]])
+  }
+  rm(i)
+
+  # check if prepareVdata_CHM_T_returnList exists
+  if (!exists("prepareVdata_CHM_T_returnList")) {
+    print("prepareVdata_CHM_T_returnList not detected, please follow the instruction and run v_prepareVdata_CHM_T function before continue")
+    stop()
+  } else {
+    print("prepareVdata_CHM_T_returnList detected, start extracting CHM_T variables")
+  }
+
+  # extract CHM_T variables from return list
+  for (i in 1:length(prepareVdata_CHM_T_returnList)) {
+    assign(x = names(prepareVdata_CHM_T_returnList)[i], value = prepareVdata_CHM_T_returnList[[i]])
+  }
+  rm(i)
+
+  # arguments modifiers, v_chmTranscript
+  print("Checking the values of the following arguments, modifiers may be applied due to interplay. Please check argument description for more information.")
+  print("----------Original values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno} | addEvAnno: {addEvAnno}")))
+
+  significanceTest_fdrq = significanceTest_fdrq & significanceTest
+  shadowGroup[[1]] = shadowGroup[[1]] & (length(unlist(grp.list)) == length(grp.list))
+  calculateFC = (calculateFC & length(grpName_fc) == 2) & !shadowGroup[[1]]
+  addBpAnno = addBpAnno & significanceTest & !unsupervisedClustering
+  addEvAnno = addEvAnno & !unsupervisedClustering
+
+  print("----------Updated values: ----------")
+  print(as.character(glue::glue("significanceTest_fdrq: {significanceTest_fdrq} | shadowGroup: {paste0(shadowGroup[[1]], ', ', shadowGroup[[2]])} | calculateFC: {calculateFC} | addBpAnno: {addBpAnno} | addEvAnno: {addEvAnno}")))
+
+  # pre-set color scheme list for EvAnno
+  if (addEvAnno == TRUE) {
+    chm_ev_col = list()
+    for (i in 1:length(te_loader_par[["te_rowSlice"]])) {
+      chm_ev_col[[i]] = scales::hue_pal(h.start = 135)(length(te_loader_par[["te_rowSlice"]]))[i]
+    }
+    rm(i)
+    names(chm_ev_col) = te_loader_par[["te_rowSlice"]]
+    chm_ev_col[["combined"]] = scales::hue_pal(h.start = 135)(length(te_loader_par[["te_rowSlice"]]))
+  }
+
+  # big loop, based on showCOMBIonly (combined only or plus separated)
+  if (showCOMBIonly == TRUE) {
+    loopStartAt = length(te.list.c)
+  } else {
+    loopStartAt = 1
+  }
+
+  for (k in loopStartAt:length(te.list.c)) {
+
+    # initialize from te.list.c
+    te.list = te.list.c[[k]]
+
+    # reset rowSliceOrder based on loop number
+    if (k == length(te.list.c)) {
+      rowSliceOrder = te_loader_par[["te_rowSlice"]]
+    } else {
+      rowSliceOrder = te_loader_par[["te_rowSlice"]][k]
+    }
+
+    # the rest parts of original chmTranscript function
+
+    # unify transcript numbers in te.list in case samples have differnt number of transcripts
+    te.unif = dplyr::bind_rows(te.list)
+    te.unif["Occurrence"] = 1
+    te.unif = te.unif[, -2]
+    te.unif = te.unif %>% dplyr::group_by(Transcript) %>% dplyr::summarise(TotalOccurrence = sum(Occurrence))
+    te.unif = subset(te.unif, subset = TotalOccurrence == length(te.list))
+    te.unif = unlist(te.unif[, 1])
+    te.list = lapply(te.list, function(x) {
+      x = subset(x, subset = Transcript %in% te.unif)
+      return(x)
+    })
+    rm(te.unif)
+
+    # filter out outlier transcripts
+    if (filterOutlier == TRUE) {
+      te.grp = list()
+      for (i in 1:length(grpName)) {
+        te.grp[[i]] = te.list[names(te.list) %in% grp.list[[i]]]
+      }
+      rm(i)
+      names(te.grp) = grpName
+
+      # filter outlier from selected group only
+      te.grp = subset(te.grp, subset = names(te.grp) %in% filterOutlier_fromGroup)
+
+      # original filter process
+      te.grp.iqr = list()
+      te.grp.iqr = lapply(te.grp, dplyr::bind_rows)
+      te.grp.iqr = lapply(te.grp.iqr, function(x) {
+        x = dplyr::group_by(x, Transcript, Gene)
+        x = dplyr::summarise(x, Outlier = length(unlist(boxplot.stats(TPM)["out"])))
+        x = as.data.frame(x)
+      })
+
+      for (i in 1:length(te.grp.iqr)) {
+        filterThreshold = floor(length(te.grp[[i]]) * filterStringency)
+        te.grp.iqr[[i]][te.grp.iqr[[i]][, 3] <= filterThreshold, 3] = 0
+      }
+      rm(i, filterThreshold)
+
+      te.iqr = dplyr::bind_rows(te.grp.iqr)
+      te.iqr = te.iqr %>% dplyr::group_by(Transcript, Gene) %>% dplyr::summarise(TotalOutlier = sum(Outlier))
+      signature_panel.filtered = unlist(subset(te.iqr, subset = TotalOutlier == 0)[, 1])
+
+      te.list = lapply(te.list, function(x) {
+        x = subset(x, subset = Transcript %in% signature_panel.filtered)
+      })
+
+      rm(te.grp, te.grp.iqr, te.iqr, signature_panel.filtered)
+    }
+
+    # subset groupInfo and te.list for plot purpose only, e.g. use Normal group for background subtraction but don't show this group
+    if (length(colSliceOrder) != length(grpName)) {
+      print(as.character(glue::glue("Group not shown: {setdiff(grpName, colSliceOrder)}")))
+      groupInfo_temp = subset(groupInfo, subset = Group %in% colSliceOrder)
+      te.list = te.list[names(te.list) %in% groupInfo_temp$assayID]
+      rm(groupInfo_temp)
+    }
+
+    # merge separate dataframes into one and rename TPM columns
+    te.chm = te.list[[1]]
+    for (i in 2:length(te.list)) {
+      te.chm = cbind(te.chm, te.list[[i]][, 3])
+    }
+    rm(i)
+    colnames(te.chm) = c("Transcript", "Gene", plyr::mapvalues(names(te.list), from = groupInfo$assayID, to = groupInfo$aliasID, warn_missing = FALSE))
+
+    # convert dataframe te.chm to matrix te.chm.p, and set te.chm.pmg
+    te.chm.p = te.chm[, -c(1, 2)]
+    te.chm.p = as.matrix(te.chm.p)
+    rownames(te.chm.p) = te.chm[, 1]
+    te.chm.p[is.na(te.chm.p)] = 0 # replace NA with 0
+    te.chm.p[te.chm.p < 0] = 0 # replace negative value with 0 (for subtraction-normolized group)
+    if (filterNoTPM == TRUE) {
+      te.chm.p = te.chm.p[rowSums(te.chm.p, na.rm = TRUE) != 0, ] # filter out genes that have TPM = 0 in all samples
+    }
+    min0offset_min = min(te.chm.p[te.chm.p > 0]) / 10
+    min0offset_min = 10 ^ (floor(log10(min0offset_min)))
+    min0offset_max = 10 ^ (-ceiling(log10(max(te.chm.p))))
+    min0offset = min(min0offset_min, min0offset_max)
+    rm(min0offset_min, min0offset_max)
+    te.chm.p = te.chm.p + min0offset # add 10e-3 to fix log(0) issue
+    if (significanceTest_inputForm == "log10") {
+      te.chm.pm = reshape2::melt(log10(te.chm.p))
+    } else if (significanceTest_inputForm == "log2") {
+      te.chm.pm = reshape2::melt(log2(te.chm.p))
+    } else {
+      te.chm.pm = reshape2::melt(te.chm.p)
+    }
+    te.chm.pmg = te.chm.pm
+    te.chm.pmg["Group"] = factor(plyr::mapvalues(te.chm.pmg[, 2], from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE), levels = colSliceOrder)
+    colnames(te.chm.pmg) = c("Transcript", "Sample.ID", "Expression.Value", "Group")
+    rm(min0offset, te.chm.pm)
+
+    # reform te.chm.pmg and set grp.list_shadow
+    if (shadowGroup[[1]] == TRUE) {
+      grpName_pval = groupInfo$aliasID
+      grp.list_shadow = c(rep(list(te.chm.pmg), times = shadowGroup[[2]]))
+      grp.list_shadow = lapply(grp.list_shadow, function(x) {
+        x$Group = x$Sample.ID
+        return(x)
+      })
+      names(grp.list_shadow) = paste0("shadow_", 1:shadowGroup[[2]])
+      shadow_multiplier = seq(from = 0.5, to = 1.5, length.out = shadowGroup[[2]])
+      for (i in 1:shadowGroup[[2]]) {
+        grp.list_shadow[[i]]$Sample.ID = paste0(grp.list_shadow[[i]]$Sample.ID, "_", names(grp.list_shadow)[i])
+        grp.list_shadow[[i]]$Expression.Value = grp.list_shadow[[i]]$Expression.Value * shadow_multiplier[i]
+      }
+      rm(i)
+      grp.list_shadow = dplyr::bind_rows(grp.list_shadow)
+      te.chm.pmg = grp.list_shadow
+      rm(grp.list_shadow, shadow_multiplier)
+    } else {
+      te.chm.pmg = subset(te.chm.pmg, subset = Group %in% grpName_pval)
+    }
+
+    # convert TPM to log10/2 ratio, for heatmap mainbody plotting only
+    if (significanceTest_inputForm == "log10") {
+      te.chm.p.log10 = log10(te.chm.p)
+    } else if (significanceTest_inputForm == "log2") {
+      te.chm.p.log10 = log2(te.chm.p)
+    } else {
+      te.chm.p.log10 = te.chm.p
+    }
+
+    # add t-test/anova significance test based number of groups, and prepare data for boxplot annotation
+    if (significanceTest == TRUE) {
+      tempPaired = (length(grpName_pval) == 2) & (sum(assayID_rna %in% grp.list[[grpName_pval[1]]]) == sum(assayID_rna %in% grp.list[[grpName_pval[2]]]))
+      if (shadowGroup[[1]] == TRUE) {
+        tempPaired = TRUE
+      }
+      te.chm.p.pval = compare_means(Expression.Value ~ Group, data = te.chm.pmg, method = ifelse(length(grpName_pval) > 2, "anova", "t.test"), group.by = "Transcript", paired = tempPaired)
+      tempRownames = te.chm.p.pval$Transcript
+      te.chm.p.pval = as.matrix(te.chm.p.pval$p)
+      rownames(te.chm.p.pval) = tempRownames
+      colnames(te.chm.p.pval) = "p-value"
+      te.chm.p.pval.sig = subset(te.chm.p.pval, subset = te.chm.p.pval[, 1] <= 0.05)
+      tempRownames_sig = rownames(te.chm.p.pval.sig)
+      te.chm.p.log10 = te.chm.p.log10[rownames(te.chm.p.log10) %in% tempRownames, ]
+      te.chm.pmg.sig = subset(te.chm.pmg, subset = Transcript %in% tempRownames_sig)
+
+      # calculate false discovery rate q-value (fdrq)
+      if (significanceTest_fdrq == TRUE) {
+        te.chm.p.fdrq = qvalue(p = unlist(te.chm.p.pval[, 1]), pi0 = 1)[["qvalues"]]
+        te.chm.p.fdrq = as.matrix(te.chm.p.fdrq)
+        colnames(te.chm.p.fdrq) = "q-value"
+        te.chm.p.fdrq.sig = subset(te.chm.p.fdrq, subset = rownames(te.chm.p.fdrq) %in% tempRownames_sig)
+      }
+
+      # conduct pair-wise t-test for detailed csv output of ANOVA test
+      if (length(grpName_pval) > 2 & nrow(te.chm.pmg.sig) > 0 & shadowGroup[[1]] == FALSE) {
+
+        # shuffle the data (add slight randomness to the constant part) to prevent "data are essentially constant" error
+        tempMinVal = min(te.chm.pmg.sig[, 3])
+        for (i in 1:nrow(te.chm.pmg.sig)) {
+          if (te.chm.pmg.sig[i, 3] == tempMinVal) {
+            tempShuffle = runif(1) / 1000
+            te.chm.pmg.sig[i, 3] = te.chm.pmg.sig[i, 3] + tempShuffle
+            rm(tempShuffle)
+          }
+        }
+        rm(i, tempMinVal)
+
+        # original pair-wise t-test process
+        te.chm.p.pval.sig.ttest = compare_means(Expression.Value ~ Group, data = te.chm.pmg.sig, method = "t.test", group.by = "Transcript", paired = tempPaired)
+        te.chm.p.pval.sig.ttest = te.chm.p.pval.sig.ttest[, c(1, 3:5, 8)]
+        colnames(te.chm.p.pval.sig.ttest) = c("Transcript", "Group_1", "Group_2", "p-value", "Significance_Level")
+        te.chm.p.pval.sig.ttest["NOTES"] = ""
+        te.chm.p.pval.sig.ttest[1, "NOTES"] = "Open this file with a text editor in case Excel-unsupported encoding characters appear."
+        print(as.character(glue::glue("Additional pair-wise t-test completed, output csv file saved in {outputFolderPath}")))
+        write.csv(te.chm.p.pval.sig.ttest, file = paste0(outputFolderPath, studyID, "_TranscriptExpression_PairWiseTTest_fromAnovaSigOnly.csv"), quote = FALSE, row.names = FALSE, fileEncoding = "UTF-8")
+        rm(te.chm.p.pval.sig.ttest)
+      }
+
+      # rm temp significance test variables
+      rm(tempRownames, tempRownames_sig, te.chm.p.pval.sig, tempPaired)
+    }
+
+    # calculate fold change log10 ratio for transcript expression data
+    if (calculateFC == TRUE) {
+      te.foldchange = v_chmFoldChangeLog10(outputFolderPath, log10Threshold, grpName_fc, TPM2RHKG = "FPKM", filterNoTPM)
+      signature_panel.fc.te = te.foldchange[, -3]
+      signature_panel.fc.te = subset(signature_panel.fc.te, subset = Transcript %in% rownames(te.chm.p))
+      signature_panel.fc.te = dplyr::arrange(signature_panel.fc.te, dplyr::desc(Log10_FC))
+      te.chm.p.log10 = te.chm.p.log10[signature_panel.fc.te$Transcript, ]
+      if (significanceTest == TRUE) {
+        te.chm.p.pval = as.matrix(te.chm.p.pval[signature_panel.fc.te$Transcript, ])
+        colnames(te.chm.p.pval) = "p-value"
+      }
+      if (significanceTest_fdrq == TRUE) {
+        te.chm.p.fdrq = as.matrix(te.chm.p.fdrq[signature_panel.fc.te$Transcript, ])
+        colnames(te.chm.p.fdrq) = "q-value"
+      }
+      tempRownames.fc.te = signature_panel.fc.te$Transcript
+      signature_panel.fc.te = as.matrix(signature_panel.fc.te[, -1])
+      rownames(signature_panel.fc.te) = tempRownames.fc.te
+      colnames(signature_panel.fc.te) = "Log10_FC"
+      rm(tempRownames.fc.te)
+    }
+
+    # output significance test and fold-change calculation results to csv file
+    if (any(significanceTest, calculateFC)) {
+      outputCSV_moduleStatus = c(signature_panel.fc.te = calculateFC, te.chm.p.pval= significanceTest, te.chm.p.fdrq = significanceTest_fdrq)
+      tempCSV = ""
+      for (i in 1:length(outputCSV_moduleStatus)) {
+        if (outputCSV_moduleStatus[i] == TRUE) {
+          if (nchar(tempCSV) == 0 ) {
+            tempCSV = paste0(tempCSV, names(outputCSV_moduleStatus)[i])
+          } else {
+            tempCSV = paste0(tempCSV, ", ", names(outputCSV_moduleStatus)[i])
+          }
+        }
+      }
+      rm(i)
+      tempCSV = glue::glue("cbind({tempCSV})")
+      tempCSV = eval(parse(text = tempCSV))
+      rm(outputCSV_moduleStatus)
+
+      tempCSV = as.data.frame(tempCSV, stringAsFactor = FALSE)
+      tempCSV_suffix = c("_FC" = calculateFC, "_pval" = significanceTest, "_fdrq" = significanceTest_fdrq)
+      tempCSV_suffix = tempCSV_suffix[tempCSV_suffix]
+      tempCSV_suffix = names(tempCSV_suffix)
+      tempCSV_suffix = paste0(tempCSV_suffix, collapse = "")
+      tempCSV["NOTES"] = ""
+      tempCSV[1, "NOTES"] = "Open this file with a text editor in case many false 0 values appear (Excel only supports maximum precision digits of 15)."
+      print(as.character(glue::glue("Local computation and analysis completed, output csv file saved in {outputFolderPath}")))
+      write.csv(tempCSV, file = paste0(outputFolderPath, studyID, "_TranscriptExpression", tempCSV_suffix, ".csv"), quote = FALSE, row.names = TRUE, fileEncoding = "UTF-8")
+      rm(tempCSV, tempCSV_suffix)
+    }
+
+    # calculate average expression value of single gene for EvAnno
+    if (addEvAnno == TRUE) {
+      te.chm.p.ev = as.data.frame(te.chm.p, stringsAsFactors = FALSE)
+      geneLvl = plyr::mapvalues(rownames(te.chm.p.ev), from = te_loader_par[["t2gMapping"]]$Transcript, to = te_loader_par[["t2gMapping"]]$Gene, warn_missing = FALSE)
+      te.chm.p.ev = cbind(geneLvl, te.chm.p.ev)
+      rm(geneLvl)
+      if (significanceTest == TRUE) {
+        te.chm.p.pval.sig = subset(te.chm.p.pval, subset = te.chm.p.pval[, "p-value"] <= 0.05)
+        te.chm.p.log10.sig = subset(te.chm.p.log10, subset = rownames(te.chm.p.log10) %in% rownames(te.chm.p.pval.sig))
+        te.chm.p.ev.sig = subset(te.chm.p.ev, subset = rownames(te.chm.p.ev) %in% rownames(te.chm.p.pval.sig))
+        rm(te.chm.p.pval.sig)
+      }
+      te.chm.p.ev = te.chm.p.ev %>% dplyr::group_by(geneLvl) %>% dplyr::summarise_all(.vars = colnames(te.chm.p.ev)[-1], .fun = mean)
+      tempRownames = unlist(te.chm.p.ev[, 1])
+      te.chm.p.ev = te.chm.p.ev[, -1]
+      te.chm.p.ev = as.matrix(te.chm.p.ev, stringAsFactor = FALSE)
+      rownames(te.chm.p.ev) = tempRownames
+      rm(tempRownames)
+      if (significanceTest == TRUE) {
+        te.chm.p.ev.sig = te.chm.p.ev.sig %>% dplyr::group_by(geneLvl) %>% dplyr::summarise_all(.vars = colnames(te.chm.p.ev.sig)[-1], .fun = mean)
+        tempRownames = unlist(te.chm.p.ev.sig[, 1])
+        te.chm.p.ev.sig = te.chm.p.ev.sig[, -1]
+        te.chm.p.ev.sig = as.matrix(te.chm.p.ev.sig, stringAsFactor = FALSE)
+        rownames(te.chm.p.ev.sig) = tempRownames
+        rm(tempRownames)
+      }
+    }
+
+    # reset column order based on groupInfo$aliasID, also affect EvAnno
+    te.chm.p.log10 = te.chm.p.log10[, sort(colnames(te.chm.p.log10))]
+    if (addEvAnno == TRUE) {
+      te.chm.p.ev = te.chm.p.ev[, sort(colnames(te.chm.p.ev))]
+      if (is.matrix(te.chm.p.ev) == TRUE) {
+        te.chm.p.ev = t(te.chm.p.ev)
+        te.chm.p.ev = te.chm.p.ev[, ncol(te.chm.p.ev):1, drop = FALSE]
+      } else {
+        te.chm.p.ev = as.matrix(te.chm.p.ev)
+      }
+      if (significanceTest == TRUE & nrow(te.chm.p.log10.sig) > 0) {
+        te.chm.p.log10.sig = te.chm.p.log10.sig[, sort(colnames(te.chm.p.log10.sig))]
+        te.chm.p.ev.sig = te.chm.p.ev.sig[, sort(colnames(te.chm.p.ev.sig))]
+        if (is.matrix(te.chm.p.ev.sig) == TRUE) {
+          te.chm.p.ev.sig = t(te.chm.p.ev.sig)
+          te.chm.p.ev.sig = te.chm.p.ev.sig[, ncol(te.chm.p.ev.sig):1, drop = FALSE]
+        } else {
+          te.chm.p.ev.sig = as.matrix(te.chm.p.ev.sig)
+        }
+      }
+    }
+
+    # preset default chm_fdrq annotation for chm.sigpan_ge.pval
+    chm_fdrq = NULL
+
+    # set chm_fdrq annotation for chm.te.pval
+    if (significanceTest == TRUE & significanceTest_fdrq == TRUE) {
+      te.chm.p.fdrq.nglog10 = -log10(te.chm.p.fdrq)
+      TECM.breakpoint.fdrq = ceiling(max(te.chm.p.fdrq.nglog10))
+      TECM.breakpoint.fdrq = max(TECM.breakpoint.fdrq, 2)
+      if (TECM.breakpoint.fdrq %% 2 != 0) {
+        TECM.breakpoint.fdrq = TECM.breakpoint.fdrq + 1
+      }
+      TECM.fdrq = colorRamp2(breaks = c(0, TECM.breakpoint.fdrq), colors = c("white", "red3"))
+      chm_fdrq_col = TECM.fdrq(te.chm.p.fdrq.nglog10[, 1])
+      if (nrow(te.chm.pmg.sig) > 0) {
+        te.chm.p.fdrq.nglog10.sig = -log10(te.chm.p.fdrq.sig)
+        chm_fdrq_col.sig = TECM.fdrq(te.chm.p.fdrq.nglog10.sig[, 1])
+      }
+      chm_fdrq = rowAnnotation(NgLog10_FDR = anno_barplot(te.chm.p.fdrq.nglog10[, 1], baseline = 0, gp = gpar(fill = chm_fdrq_col, col = chm_fdrq_col), bar_width = 0.66, axis_param = list(at = c(0, TECM.breakpoint.fdrq * 0.5, TECM.breakpoint.fdrq, 1.3), labels = as.character(c(0, TECM.breakpoint.fdrq * 0.5, TECM.breakpoint.fdrq, "p")), gp = gpar(fontsize = 6), labels_rot = 0, side = "bottom"), ylim = c(0, TECM.breakpoint.fdrq)), annotation_name_gp = gpar(fontsize = 8, fontface = "bold"), annotation_name_side = "bottom", annotation_name_rot = 0, width = unit(2, "cm"))
+    }
+
+    # set chm_ev annotation for chm.te.p
+    if (addEvAnno == TRUE) {
+      TECM.breakpoint.ev = ceiling(max(rowSums(te.chm.p.ev)))
+      TECM.breakpoint.ev.c = ceiling(c(0, TECM.breakpoint.ev * 0.25, TECM.breakpoint.ev * 0.5, TECM.breakpoint.ev * 0.75, TECM.breakpoint.ev))
+      TECM.breakpoint.ev.c = unique(TECM.breakpoint.ev.c)
+      chm_ev = HeatmapAnnotation(Avg_Expr_Val = anno_barplot(te.chm.p.ev, baseline = 0, which = "column", gp = gpar(fill = rev(chm_ev_col[[k]]), col = rev(chm_ev_col[[k]])), bar_width = 0.66, axis_param = list(at = TECM.breakpoint.ev.c, gp = gpar(fontsize = 10)), ylim = c(0, TECM.breakpoint.ev)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+      if (significanceTest == TRUE & sum(te.chm.p.ev.sig, na.rm = TRUE) != 0) {
+        TECM.breakpoint.ev.sig = ceiling(max(rowSums(te.chm.p.ev.sig)))
+        TECM.breakpoint.ev.c.sig = ceiling(c(0, TECM.breakpoint.ev.sig * 0.25, TECM.breakpoint.ev.sig * 0.5, TECM.breakpoint.ev.sig * 0.75, TECM.breakpoint.ev.sig))
+        TECM.breakpoint.ev.c.sig = unique(TECM.breakpoint.ev.c.sig)
+        if (k == length(te.list.c)) {
+          chm_ev_col.sig = chm_ev_col[c(names(chm_ev_col) %in% colnames(te.chm.p.ev.sig))]
+          chm_ev_col.sig = unlist(chm_ev_col.sig)
+        } else {
+          chm_ev_col.sig = chm_ev_col[[k]]
+        }
+        chm_ev.sig = HeatmapAnnotation(Avg_Expr_Val = anno_barplot(te.chm.p.ev.sig, baseline = 0, which = "column", gp = gpar(fill = rev(chm_ev_col.sig), col = rev(chm_ev_col.sig)), bar_width = 0.66, axis_param = list(at = TECM.breakpoint.ev.c.sig, gp = gpar(fontsize = 10)), ylim = c(0, TECM.breakpoint.ev.sig)), annotation_name_gp = gpar(fontsize = 7, fontface = "bold"), annotation_name_side = "left", annotation_name_rot = 0, height = unit(2, "cm"))
+      } else {
+        chm_ev_col.sig = "black"
+        chm_ev.sig = NULL
+      }
+    } else {
+      chm_ev = NULL
+      chm_ev.sig = NULL
+    }
+
+    # set parameter for splitting rows and columns, also affect EvAnno
+    split_row = factor(plyr::mapvalues(rownames(te.chm.p.log10), from = te.chm$Transcript, to = te.chm$Gene, warn_missing = FALSE), levels = rowSliceOrder)
+    temp_groupInfo = plyr::arrange(groupInfo, aliasID)
+    temp_groupInfo = subset(temp_groupInfo, subset = assayID %in% names(te.list))
+    split_col = factor(unlist(temp_groupInfo$Group), levels = colSliceOrder)
+    rm(temp_groupInfo)
+    if (unsupervisedClustering == TRUE) {
+      split_row = NULL
+      rowSliceOrder = "Undefined"
+      split_col = NULL
+    }
+
+    # set color mapping
+    if (significanceTest_inputForm %in% c("log10", "log2")) {
+      TECM.breakpoint = max(abs(floor(min(te.chm.p.log10)) - 1), ceiling(max(te.chm.p.log10)))
+      TECM.breakpoint = c(-TECM.breakpoint, TECM.breakpoint)
+      TECM.log10 = colorRamp2(c(TECM.breakpoint[1], 0, TECM.breakpoint[2]), c("royalblue3", "white", "red3"))
+    } else {
+      TECM.breakpoint = ceiling(max(te.chm.p.log10))
+      TECM.breakpoint = c(TECM.breakpoint, TECM.breakpoint)
+      TECM.log10 = colorRamp2(c(0, TECM.breakpoint[1]), c("white", "red3"))
+    }
+    TECM.pval = colorRamp2(breaks = c(0, 0.05), colors = c("magenta3", "white"))
+    if (calculateFC == TRUE) {
+      TECM.breakpoint.fc = min(abs(floor(min(signature_panel.fc.te))), ceiling(max(signature_panel.fc.te)))
+      if (length(unique(c(-TECM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], TECM.breakpoint.fc))) == 5) {
+        TECM.fc = colorRamp2(c(-TECM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], TECM.breakpoint.fc), c("limegreen", "white", "white", "white", "orange"))
+      } else {
+        TECM.fc = colorRamp2(sort(unique(c(-TECM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], TECM.breakpoint.fc))), c("limegreen", "white", "orange"))
+      }
+    }
+
+    # set chm_row_names_gp and chm_col_names_gp (show/not show & font size), also affect EvAnno
+    chm_row_names_gp = dplyr::case_when(
+      nrow(te.chm.p.log10) <= 50 ~ list(TRUE, 6 - (nrow(te.chm.p.log10) - 10) / 10),
+      nrow(te.chm.p.log10) > 50 ~ list(FALSE, 1)
+    )
+    if (addEvAnno == TRUE) {
+      chm_row_names_gp[[3]] = chm_ev_col[[k]]
+      if (significanceTest == TRUE) {
+        chm_row_names_gp[[4]] = chm_ev_col.sig
+      }
+    } else {
+      chm_row_names_gp[[3]] = "black"
+      chm_row_names_gp[[4]] = "black"
+    }
+
+    chm_col_names_gp = dplyr::case_when(
+      ncol(te.chm.p.log10) <= 90 ~ list(TRUE, 10 - (ncol(te.chm.p.log10) - 10) / 10),
+      ncol(te.chm.p.log10) > 90 ~ list(FALSE, 1)
+    )
+
+    # render complex heatmap
+    chm.te.p = Heatmap(te.chm.p.log10, name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col, col = TECM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                       row_title_rot = 0,
+                       row_names_rot = 0,
+                       row_title_gp = gpar(fontsize = 9, fontface = "bold", col = chm_row_names_gp[[3]]),
+                       show_row_names = chm_row_names_gp[[1]][1],
+                       row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1], col = chm_row_names_gp[[3]]),
+                       row_names_side = "right",
+                       cluster_rows = unsupervisedClustering,
+                       cluster_row_slices = unsupervisedClustering,
+                       cluster_columns = unsupervisedClustering,
+                       cluster_column_slices = unsupervisedClustering,
+                       column_title_rot = 0,
+                       column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                       column_names_rot = 45,
+                       show_column_names = chm_col_names_gp[[1]][1],
+                       column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1]),
+                       column_names_side = "bottom",
+                       top_annotation = chm_ev,
+                       heatmap_legend_param = list(direction = "horizontal", col_fun = TECM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(TECM.breakpoint[1], 0, TECM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)))
+
+    chm.te.list = chm.te.p
+
+    if (significanceTest == TRUE) {
+      chm.te.p.sig = Heatmap(te.chm.p.log10, name = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), row_split = split_row, column_split = split_col, col = TECM.log10, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                             row_title_rot = 0,
+                             row_names_rot = 0,
+                             row_title_gp = gpar(fontsize = 9, fontface = "bold", col = chm_row_names_gp[[4]]),
+                             show_row_names = chm_row_names_gp[[1]][1],
+                             row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1], col = chm_row_names_gp[[4]]),
+                             row_names_side = "right",
+                             cluster_rows = unsupervisedClustering,
+                             cluster_row_slices = unsupervisedClustering,
+                             cluster_columns = unsupervisedClustering,
+                             cluster_column_slices = unsupervisedClustering,
+                             column_title_rot = 0,
+                             column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                             column_names_rot = 45,
+                             show_column_names = chm_col_names_gp[[1]][1],
+                             column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1]),
+                             column_names_side = "bottom",
+                             top_annotation = chm_ev.sig,
+                             heatmap_legend_param = list(direction = "horizontal", col_fun = TECM.log10, title = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression\n   log-ratio", "Expression\n     Value"), legend_width = unit(2, "cm"), at = sort(unique(c(TECM.breakpoint[1], 0, TECM.breakpoint[2]))), labels_rot = ifelse(significanceTest_inputForm %in% c("log10", "log2"), 0, 45)))
+
+      chm.te.list.sig = chm.te.p.sig
+
+      chm.te.pval = Heatmap(te.chm.p.pval, name = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), row_split = split_row, column_split = NULL, col = TECM.pval, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                            row_title_rot = 0,
+                            row_names_rot = 0,
+                            row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                            row_names_gp = gpar(fontsize = 3),
+                            row_names_side = "right",
+                            show_row_names = FALSE,
+                            cluster_rows = unsupervisedClustering,
+                            cluster_row_slices = unsupervisedClustering,
+                            cluster_columns = FALSE,
+                            column_title_rot = 0,
+                            column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                            column_names_rot = 45,
+                            column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                            column_names_side = "bottom",
+                            right_annotation = chm_fdrq,
+                            heatmap_legend_param = list(direction = "horizontal", col_fun = TECM.pval, at = c(0, 0.05), labels = c("0", "0.05"), title = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), legend_width = unit(1.75, "cm")))
+
+      if (calculateFC == FALSE) {
+        chm.te.list = chm.te.list + chm.te.pval
+        chm.te.list.sig = chm.te.list.sig + chm.te.pval
+        chm.te.list.sig.sub = chm.te.list.sig[te.chm.p.pval[, "p-value"] <= 0.05, ]
+      }
+    }
+
+    if (calculateFC == TRUE) {
+      chm.te.fc = Heatmap(signature_panel.fc.te, name = "Fold-Change\n   log-ratio", row_split = split_row, column_split = NULL, col = TECM.fc, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                          row_title_rot = 0,
+                          row_names_rot = 0,
+                          row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                          row_names_gp = gpar(fontsize = 3),
+                          row_names_side = "right",
+                          show_row_names = FALSE,
+                          cluster_rows = unsupervisedClustering,
+                          cluster_row_slices = unsupervisedClustering,
+                          cluster_columns = FALSE,
+                          column_title_rot = 0,
+                          column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                          column_names_rot = 45,
+                          column_names_gp = gpar(fontsize = 9, fontface = "bold"),
+                          column_names_side = "bottom",
+                          heatmap_legend_param = list(direction = "horizontal", col_fun = TECM.fc, at = unique(c(-TECM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], TECM.breakpoint.fc)), labels = unique(c(-TECM.breakpoint.fc, log10Threshold[2], 0, log10Threshold[1], TECM.breakpoint.fc)), title = "Fold-Change\n   log-ratio", legend_width = unit(2, "cm")))
+
+      if (significanceTest == TRUE) {
+        chm.te.list = chm.te.list + chm.te.fc + chm.te.pval
+        chm.te.list.sig = chm.te.list.sig + chm.te.fc + chm.te.pval
+        chm.te.list.sig.sub = chm.te.list.sig[te.chm.p.pval[, "p-value"] <= 0.05, ]
+      } else {
+        chm.te.list = chm.te.list + chm.te.fc
+      }
+    }
+
+    # set file name suffix
+    chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, addEvAnno, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm)) # always put "filterOutlier" at last, for function complete return message
+    names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_EvAnno", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm))
+    chm_suffix = ""
+    for (i in 1:length(chm_moduleStatus)) {
+      if (chm_moduleStatus[i] == TRUE) {
+        chm_suffix = paste0(chm_suffix, names(chm_moduleStatus)[i])
+      }
+    }
+    rm(i)
+
+    # save complex heatmap file and output matrix file
+    png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_all.png"), width = 3339, height = 2160, units = "px", res = 300)
+    draw(chm.te.list, auto_adjust = FALSE, heatmap_legend_side = "right")
+    if (any(significanceTest, calculateFC)) {
+      output_row_order = unlist(row_order(chm.te.list@ht_list[[1]]))
+      output_col_order = unlist(column_order(chm.te.list@ht_list[[1]]))
+      output_ge_mat = chm.te.list@ht_list[[1]]@matrix
+    } else {
+      output_row_order = unlist(row_order(chm.te.list))
+      output_col_order = unlist(column_order(chm.te.list))
+      output_ge_mat = chm.te.list@matrix
+    }
+    output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+    write.csv(output_ge_mat, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_all.csv"), quote = FALSE, fileEncoding = "UTF-8")
+    rm(output_row_order, output_col_order, output_ge_mat)
+    if (significanceTest_fdrq == TRUE) {
+      for (i in 1:length(rowSliceOrder)) {
+        decorate_annotation("NgLog10_FDR", {
+          grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+        }, slice = i)
+        for (j in seq(0, TECM.breakpoint.fdrq, length.out = 5)) {
+          decorate_annotation("NgLog10_FDR", {
+            grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+          }, slice = i)
+        }
+        rm(j)
+      }
+      rm(i)
+    }
+    if (addEvAnno == TRUE) {
+      for (i in 1:length(colSliceOrder)) {
+        decorate_annotation("Avg_Expr_Val", {
+          grid.lines(c(0, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+        }, slice = i)
+
+        for (j in TECM.breakpoint.ev.c) {
+          decorate_annotation("Avg_Expr_Val", {
+            grid.lines(c(0, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+          }, slice = i)
+        }
+        rm(j)
+      }
+      rm(i)
+    }
+    dev.off()
+
+    if (significanceTest == TRUE) {
+      tryCatch({
+        png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_sigOnly.png"), width = 3339, height = 2160, units = "px", res = 300)
+        draw(chm.te.list.sig.sub, auto_adjust = FALSE, heatmap_legend_side = "right")
+        output_row_order.sig = unlist(row_order(chm.te.list.sig.sub@ht_list[[1]]))
+        output_col_order.sig = unlist(column_order(chm.te.list.sig.sub@ht_list[[1]]))
+        output_ge_mat.sig = chm.te.list.sig.sub@ht_list[[1]]@matrix
+        output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+        write.csv(output_ge_mat.sig, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_TranscriptExpression", chm_suffix, "_", gsub("Gene: ", "", names(te.list.c)[k]), "_sigOnly.csv"), quote = FALSE, fileEncoding = "UTF-8")
+        rm(output_row_order.sig, output_col_order.sig, output_ge_mat.sig)
+        if (significanceTest_fdrq == TRUE) {
+          rowSliceOrder_sig = unique(plyr::mapvalues(rownames(te.chm.p.fdrq.nglog10.sig), from = te_loader_par[["t2gMapping"]]$Transcript, to = te_loader_par[["t2gMapping"]]$Gene, warn_missing = FALSE))
+          rowSliceOrder_sig = subset(rowSliceOrder, subset = rowSliceOrder %in% rowSliceOrder_sig)
+          for (i in 1:length(rowSliceOrder_sig)) {
+            decorate_annotation("NgLog10_FDR", {
+              grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))
+            }, slice = i)
+            for (j in seq(0, TECM.breakpoint.fdrq, length.out = 5)) {
+              decorate_annotation("NgLog10_FDR", {
+                grid.lines(y = c(0, 1), x = unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+              }, slice = i)
+            }
+            rm(j)
+          }
+          rm(i)
+        }
+        if (addEvAnno == TRUE) {
+          for (i in 1:length(colSliceOrder)) {
+            decorate_annotation("Avg_Expr_Val", {
+              grid.lines(c(0, 1), unit(c(0, 0), "native"), gp = gpar(lty = 1, col = "#00000066", lwd = 0.75))
+            }, slice = i)
+
+            for (j in TECM.breakpoint.ev.c.sig) {
+              decorate_annotation("Avg_Expr_Val", {
+                grid.lines(c(0, 1), unit(c(j, j), "native"), gp = gpar(lty = 1, col = "#00000033", lwd = 0.5))
+              }, slice = i)
+            }
+            rm(j)
+          }
+          rm(i)
+        }
+        dev.off()}, error = function(x) {print(as.character(glue::glue("No significant transcripts, of {names(te.list.c)[k]}!")))})
+    }
+
+    # add boxplot annotation
+    if (addBpAnno == TRUE) {
+
+      # set rowOrder to match heatmap rowOrder
+      if (calculateFC == TRUE) {
+        te.chm_bpAnno_xaxis_order = as.data.frame(rownames(signature_panel.fc.te), stringsAsFactors = FALSE)
+      } else {
+        te.chm_bpAnno_xaxis_order = as.data.frame(rownames(te.chm.p.pval), stringsAsFactors = FALSE)
+      }
+      colnames(te.chm_bpAnno_xaxis_order) = "Transcript"
+      te.chm_bpAnno_xaxis_order = cbind(te.chm_bpAnno_xaxis_order, "Gene" = factor(plyr::mapvalues(te.chm_bpAnno_xaxis_order$Transcript, from = te_loader_par[["t2gMapping"]]$Transcript, to = te_loader_par[["t2gMapping"]]$Gene, warn_missing = FALSE), levels = rowSliceOrder))
+      te.chm_bpAnno_xaxis_order = plyr::arrange(te.chm_bpAnno_xaxis_order, Gene)
+
+      # set auto-adjusted bottom margin based on main heatmap colnames
+      bpAnno_bottomMargin_te = max(nchar(colnames(te.chm.p.log10)))
+      bpAnno_bottomMargin_te = (bpAnno_bottomMargin_te * sinpi(45 / 180) * 0.4) * (chm_col_names_gp[[2]] / 9) + (9 - chm_col_names_gp[[2]]) / 10 + 0.05
+      bpAnno_bottomMargin_pval = ifelse(significanceTest == TRUE, nchar("p-value"), 0)
+      bpAnno_bottomMargin_pval = (bpAnno_bottomMargin_pval * sinpi(45 / 180) * 0.4) + 0.05
+      bpAnno_bottomMargin_fc = ifelse(calculateFC == TRUE, nchar("Log10_FC"), 0)
+      bpAnno_bottomMargin_fc = (bpAnno_bottomMargin_fc * sinpi(45 / 180) * 0.4) + 0.05
+      bpAnno_bottomMargin = max(bpAnno_bottomMargin_te, bpAnno_bottomMargin_pval, bpAnno_bottomMargin_fc)
+
+      # set auto-adjusted top margin based on addEvAnno condition
+      bpAnno_topMargin = ifelse(addEvAnno == TRUE, 6.15, 2)
+
+      # render boxplot annotation
+      te.chm_bpAnno = ggplot(te.chm.pmg, aes(x = reorder(Transcript, dplyr::desc(factor(Transcript, levels = te.chm_bpAnno_xaxis_order$Transcript))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin, 0.1, bpAnno_bottomMargin, 0.1), "cm")) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+
+      # save boxplot annotation file
+      png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_TE", chm_suffix, "_for_", gsub("Gene: ", "", names(te.list.c)[k]), "_all.png"), width = 720, height = 2160, units = "px", res = 150)
+      print(te.chm_bpAnno)
+      dev.off()
+
+      # combine chmTranscript and boxplot annotation, all
+      v_magick_chm(outputFolderPath, signaturePanelType = NULL, sigType = "all", moduleType = "Transcript")
+
+      if (significanceTest == TRUE) {
+        tryCatch({
+          # render and save boxplot annotation, significant only
+          te.chm_bpAnno_sig = ggplot(te.chm.pmg.sig, aes(x = reorder(Transcript, dplyr::desc(factor(Transcript, levels = te.chm_bpAnno_xaxis_order$Transcript))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin, 0.1, bpAnno_bottomMargin, 0.1), "cm")) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+
+          png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_annotation_TE", chm_suffix, "_for_", gsub("Gene: ", "", names(te.list.c)[k]), "_sigOnly.png"), width = 720, height = 2160, units = "px", res = 150)
+          print(te.chm_bpAnno_sig)
+          dev.off()
+
+          # combine chmTranscript and boxplot annotation, sigOnly
+          v_magick_chm(outputFolderPath, signaturePanelType = NULL, sigType = "sigOnly", moduleType = "Transcript")
+        }, error = function(x) {print(as.character(glue::glue("No significant transcripts, annotation, of {names(te.list.c)[k]}!")))})
+      }
+    }
+  }
+
+  # end of big loop
+  rm(k, loopStartAt)
+
+  # remove extracted global settings
+  rm(list = names(globalSettings_returnList))
+
+  # remove extracted prepareVdata_CHM_T_returnList variables
+  rm(list = names(prepareVdata_CHM_T_returnList))
+
+  # end of v_chmTranscript function
+  chm_returnBlock = ""
+  for (i in 1:length(chm_moduleStatus)) {
+    if (chm_moduleStatus[i] == TRUE) {
+      chm_returnBlock = paste0(chm_returnBlock, toupper(names(chm_moduleStatus)[i]))
+    }
+  }
+  rm(i)
+  print(as.character(glue::glue("v_chmTranscript completed {chm_returnBlock}, output plots and csv files saved in {outputFolderPath}")))
+  return()
+}
+
 # preset globalVariables for R CMD check
-utils::globalVariables(c("ENST", "FPKM_status", "GRCh37T", "GRCh38T", "GRCm38T"))
+utils::globalVariables(c("ENST", "FPKM_status", "GRCh37T", "GRCh38T", "GRCm38T", "prepareVdata_CHM_T_returnList", "te_loader_par"))

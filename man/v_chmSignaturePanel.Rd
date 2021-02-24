@@ -2,7 +2,7 @@
 % Please edit documentation in R/module_CHM_G.R
 \name{v_chmSignaturePanel}
 \alias{v_chmSignaturePanel}
-\title{Main function for module: CHM_G}
+\title{Main function for module: CHM_G (Gene)}
 \usage{
 v_chmSignaturePanel(
   outputFolderPath = "./_VK/_CHM/",

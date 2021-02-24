@@ -2,6 +2,7 @@
 
 export(v_Circos)
 export(v_chmSignaturePanel)
+export(v_chmTranscript)
 export(v_chmXcell)
 export(v_globalSettings)
 export(v_prepareVdata_CHM_G)

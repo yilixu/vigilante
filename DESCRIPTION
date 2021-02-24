@@ -1,6 +1,6 @@
 Package: vigilante
 Title: Visualizing Integrated Genomics in Linked and Nested Translational Elaboration & Knowing Numbers in Genomic Hypothesis Through Statistics
-Version: 0.0.0.9004
+Version: 0.0.0.9005
 Authors@R: c(
     person("Yili", "Xu", email = "yilixu@usc.edu", role = c("aut", "cre")),
     person("Zarko", "Manojlovic", email = "zmanojlo@usc.edu", role = c("aut")), 

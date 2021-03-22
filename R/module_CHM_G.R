@@ -1404,14 +1404,8 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
       write.csv(output_ge_mat.sig, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_SignaturePanelGeneExpression_", signaturePanelType, chm_suffix, "_sigOnly.csv"), quote = FALSE)
       rm(output_ge_mat.sig)
       if (significanceTest_fdrq == TRUE) {
-        if (calculateFC == TRUE) {
-          rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = ge.foldchange$Gene, to = ge.foldchange$Exp_Level, warn_missing = FALSE))
-          if (length(rowSliceOrder_sig) > length(rowSliceOrder)) {
-            rowSliceOrder_sig = rowSliceOrder
-          }
-        } else {
-          rowSliceOrder_sig = rowSliceOrder
-        }
+        rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = signature_panel$Gene, to = signature_panel$Pathway, warn_missing = FALSE))
+        rowSliceOrder_sig = subset(rowSliceOrder, subset = rowSliceOrder %in% rowSliceOrder_sig)
         for (i in 1:length(rowSliceOrder_sig)) {
           decorate_annotation("NgLog10_FDR", {
             grid.lines(y = c(0, 1), x = unit(c(-log10(0.05), -log10(0.05)), "native"), gp = gpar(lty = 2, col = "black", lwd = 1.5))

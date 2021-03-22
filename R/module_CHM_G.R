@@ -896,10 +896,10 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
 
   # reset column order based on groupInfo$aliasID
   ge.chm.p.log10 = ge.chm.p.log10[, sort(colnames(ge.chm.p.log10))]
-  if (calculateRS == TRUE) {
+  if (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs)) > 0) {
     ge.chm.p.log10.rs = ge.chm.p.log10.rs[, sort(colnames(ge.chm.p.log10.rs))]
     ge.chm.p.log10.rs = t(as.matrix(ge.chm.p.log10.rs))
-    if (significanceTest == TRUE) {
+    if (significanceTest == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0) {
       ge.chm.p.log10.rs.sig = ge.chm.p.log10.rs.sig[, sort(colnames(ge.chm.p.log10.rs.sig))]
       ge.chm.p.log10.rs.sig = t(as.matrix(ge.chm.p.log10.rs.sig))
     }
@@ -1330,7 +1330,7 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
     }
     rm(i)
   }
-  if (calculateRS == TRUE) {
+  if (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs)) > 0) {
     if (resizeColSlicer == FALSE) {
       for (i in 1:length(colSliceOrder)) {
         decorate_annotation("Risk_Score", {
@@ -1425,7 +1425,7 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
         }
         rm(i)
       }
-      if (calculateRS == TRUE) {
+      if (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0) {
         if (resizeColSlicer == FALSE) {
           for (i in 1:length(colSliceOrder)) {
             decorate_annotation("Risk_Score", {
@@ -1490,7 +1490,14 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
     bpAnno_bottomMargin = max(bpAnno_bottomMargin_ge, bpAnno_bottomMargin_pval, bpAnno_bottomMargin_fc)
 
     # set auto-adjusted top margin based on calculateRS condition
-    bpAnno_topMargin = ifelse(calculateRS == TRUE, 6.15, 2)
+    tempTopMargin = (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs)) > 0)
+    bpAnno_topMargin = ifelse(tempTopMargin == TRUE, 6.15, 2)
+    rm(tempTopMargin)
+    if (significanceTest == TRUE) {
+      tempTopMargin_sig = (calculateRS == TRUE && nrow(na.omit(ge.chm.p.log10.rs.sig)) > 0)
+      bpAnno_topMargin_sig = ifelse(tempTopMargin_sig == TRUE, 6.15, 2)
+      rm(tempTopMargin_sig)
+    }
 
     # set bpAnno_yaxisText_gp (show/not show & font size)
     bpAnno_yaxisText_gp = dplyr::case_when(
@@ -1513,14 +1520,14 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
     # render and save boxplot annotation, significant only
     if (significanceTest == TRUE) {
       tryCatch({
-        ge.chm_bpAnno_sig = ggplot(ge.chm.pmg.sig, aes(x = reorder(Gene, dplyr::desc(factor(Gene, levels = ge.chm_bpAnno_xaxis_order$Gene))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin, 0.1, bpAnno_bottomMargin, 0.1), "cm"), axis.text.y = element_text(color = bpAnno_yaxisText_gp[[1]][1], size = rel(bpAnno_yaxisText_gp[[2]][1]))) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
+        ge.chm_bpAnno_sig = ggplot(ge.chm.pmg.sig, aes(x = reorder(Gene, dplyr::desc(factor(Gene, levels = ge.chm_bpAnno_xaxis_order$Gene))), y = Expression.Value, fill = Group)) + geom_boxplot(aes(color = Group), outlier.size = 1) + coord_flip() + scale_y_reverse() + scale_x_discrete(position = "top") + labs(x = NULL, y = ifelse(significanceTest_inputForm %in% c("log10", "log2"), "Expression Log Ratio", "Expression Value")) + theme_gray() + theme(legend.position = "left", plot.margin = unit(c(bpAnno_topMargin_sig, 0.1, bpAnno_topMargin_sig, 0.1), "cm"), axis.text.y = element_text(color = bpAnno_yaxisText_gp[[1]][1], size = rel(bpAnno_yaxisText_gp[[2]][1]))) + guides(color = guide_legend(reverse = TRUE), fill = guide_legend(reverse = TRUE))
         png(filename = paste0(outputFolderPath, "BoxPlotAnno4K_", studyID, "_", signaturePanelType, "_annotation_SigPan", chm_suffix, "_sigOnly.png"), width = 720, height = 2160, units = "px", res = 150)
         print(ge.chm_bpAnno_sig)
         dev.off()
 
         # combine chmSignaturePanel and boxplot annotation, sigOnly
         v_magick_chm(outputFolderPath, signaturePanelType, sigType = "sigOnly", moduleType = "Gene")
-      }, error = function(x) {print("No significant cell types!")})
+      }, error = function(x) {print("No significant genes!")})
     }
   }
 

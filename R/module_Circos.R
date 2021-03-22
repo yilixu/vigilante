@@ -272,7 +272,7 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
       mb_somatic_cut.list.c = lapply(mb_somatic.list.c, function(x) {
         x[, 2] = cut(unlist(x[, 2]), breaks = seq(0, chr_len_max, 1e7), include.lowest = TRUE)
         x[, 3] = cut(unlist(x[, 3]), breaks = seq(0, chr_len_max, 1e7), include.lowest = TRUE)
-        x = x %>% group_by(Chr, Start, End) %>% dplyr::summarize(count = dplyr::n())
+        x = x %>% dplyr::group_by(Chr, Start, End) %>% dplyr::summarize(count = dplyr::n())
         x[, 2] = gsub("\\(", "", unlist(x[, 2]))
         x[, 2] = gsub("\\[", "", unlist(x[, 2]))
         x[, 2] = gsub("\\]", "", unlist(x[, 2]))
@@ -338,7 +338,7 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
       mb_germline_cut.list.c = lapply(mb_germline.list.c, function(x) {
         x[, 2] = cut(unlist(x[, 2]), breaks = seq(0, chr_len_max, 1e7), include.lowest = TRUE)
         x[, 3] = cut(unlist(x[, 3]), breaks = seq(0, chr_len_max, 1e7), include.lowest = TRUE)
-        x = x %>% group_by(Chr, Start, End) %>% dplyr::summarize(count = dplyr::n())
+        x = x %>% dplyr::group_by(Chr, Start, End) %>% dplyr::summarize(count = dplyr::n())
         x[, 2] = gsub("\\(", "", unlist(x[, 2]))
         x[, 2] = gsub("\\[", "", unlist(x[, 2]))
         x[, 2] = gsub("\\]", "", unlist(x[, 2]))
@@ -525,6 +525,18 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
     fl.list.star = lapply(fl.list.star, setNames, fl_header)
     fl.list.star = lapply(fl.list.star, function(x) {
       x = unique(x[fl_header])
+    })
+
+    # convert logical to character for samples with empty fusion data (to avoid grouping error)
+    fl.list.fuca = lapply(fl.list.fuca, function(x) {
+      x$From = as.character(x$From)
+      x$To = as.character(x$To)
+      return(x)
+    })
+    fl.list.star = lapply(fl.list.star, function(x) {
+      x$From = as.character(x$From)
+      x$To = as.character(x$To)
+      return(x)
     })
 
     # inner-join Fusion Catcher and Star Fusion, find common fusion genes

@@ -854,9 +854,7 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
       if (significanceTest_fdrq == TRUE) {
         if (calculateFC == TRUE) {
           rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = xcell.foldchange$Cell_Type, to = xcell.foldchange$Exp_Level, warn_missing = FALSE))
-          if (length(rowSliceOrder_sig) > length(rowSliceOrder)) {
-            rowSliceOrder_sig = rowSliceOrder
-          }
+          rowSliceOrder_sig = subset(rowSliceOrder, subset = rowSliceOrder %in% rowSliceOrder_sig)
         } else {
           rowSliceOrder_sig = rowSliceOrder
         }

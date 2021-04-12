@@ -358,6 +358,8 @@ v_magick_xCell = function(outputFolderPath, sigType) {
 #' @param addBpAnno logic, whether to add boxplot annotation to the left of the main heatmap, user-set value may be automatically modified (with notice) due to interplay.
 #' @param unsupervisedClustering logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno".
 #' @param colorScheme list(character, numeric vector), set color scheme for heatmap mainbody, [[1]] mode, choose one from c("continuous", "discrete"); [[2]] breakpoints, should be a numeric vector containing breakpoints ranging from 0 to 1, inclusive; moreover, breakpoints are only used in "discrete" mode, and will be ignored in "continuous" mode. Recommended values are list(mode = "continuous", breakpoints = NULL) and list(mode = "discrete", breakpoints = seq(from = 0, to = 1, by = 0.2)). By default, will use the first recommended value, list(mode = "continuous", breakpoints = NULL).
+#' @param resizeColSlicer logic, whether to resize each column slicer shown on the heatmap, very useful when number of samples in different groups vary greatly (e.g. 10 samples in group A, 50 in group B, and 300 in group C). By default, size of each column slicer is proportional to its sample size, and thus user can use 'resizeColSlicer' to custom and balance the layout of all column slicers.
+#' @param resizeColSlicer_width integer vector, should be the same length as the number of column slicers (including additional statistical analysis results columns), and values provided here will be used in relative instead of absolute calculation. For example, there are 3 groups (A/B/C) with 10/50/300 samples in them, respectively. If there are 2 additional statistical analysis results columns, the final column slicers will be 5. Set 'resizeColSlicer_width' to rep(1, 5) will make all of the 5 column slicers the same size, but usually user may want the mainbody to be larger while the sidebar smaller, in this case, 'resizeColSlicer_width' can be set to c(rep(6, 3), rep(1, 2)) so that the 3 groups of the mainbody are in the same size while the additional statistical analysis results are only one-third of the mainbody's size.
 #'
 #' @details
 #' Here is more information about how "filterOutlier" works. To begin with, vigilante takes the generally accepted definition of outliers: observations that lie outside 1.5 * IQR (Inter Quartile Range) of the 25th or 75th quartiles are regarded as outliers.
@@ -380,7 +382,7 @@ v_magick_xCell = function(outputFolderPath, sigType) {
 #' @export
 #'
 # v_chmXcell function
-v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.xcell.result, filterOutlier = FALSE, filterOutlier_fromGroup = grpName, filterStringency = 0.1, filterNoTPM = FALSE, significanceTest = FALSE, significanceTest_inputForm = "raw", significanceTest_fdrq = FALSE, shadowGroup = list(FALSE, 5), calculateFC = FALSE, log10Threshold = c(0.3, -0.3), rowSliceOrder = c("Up-Regulated", "Within-Threshold", "Down-Regulated"), colSliceOrder = grpName, grpName_fc = grpName, grpName_pval = grpName, addBpAnno = FALSE, unsupervisedClustering = FALSE, colorScheme = list(mode = "continuous", breakpoints = seq(0, 1, 0.2))) {
+v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.xcell.result, filterOutlier = FALSE, filterOutlier_fromGroup = grpName, filterStringency = 0.1, filterNoTPM = FALSE, significanceTest = FALSE, significanceTest_inputForm = "raw", significanceTest_fdrq = FALSE, shadowGroup = list(FALSE, 5), calculateFC = FALSE, log10Threshold = c(0.3, -0.3), rowSliceOrder = c("Up-Regulated", "Within-Threshold", "Down-Regulated"), colSliceOrder = grpName, grpName_fc = grpName, grpName_pval = grpName, addBpAnno = FALSE, unsupervisedClustering = FALSE, colorScheme = list(mode = "continuous", breakpoints = seq(0, 1, 0.2)), resizeColSlicer = FALSE, resizeColSlicer_width = NULL) {
 
   # check if outputFolderPath is set
   if (is.null(outputFolderPath)) {
@@ -686,7 +688,6 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
   } else if (colorScheme[["mode"]] == "discrete") {
     SPCM.es_mat = cut(x = sort(as.vector(ge.xcell.result)), breaks = seq(from = 0, to = 1, by = 0.2), labels = NULL, include.lowest = FALSE, right = TRUE, dig.lab = 1, ordered_result = FALSE)
     SPCM.es_lvl = levels(SPCM.es_mat)
-    # SPCM.es_color = colorspace::sequential_hcl(n = length(SPCM.es_lvl), h = 260, c = c(45, 90), l = c(90, 45), power = 1)
     SPCM.es_tempContinuous = colorRamp2(c(0, 1), c("white", "royalblue3"))
     SPCM.es_color = SPCM.es_tempContinuous(seq(0.2, 1, 0.2))
     SPCM.es_obj = ColorMapping(colors = SPCM.es_color, levels = SPCM.es_lvl, na_col = "white")
@@ -712,32 +713,68 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
   )
 
   chm_col_names_gp = dplyr::case_when(
-    ncol(ge.chm.p) <= 90 ~ list(TRUE, 10 - (ncol(ge.chm.p) - 10) / 10),
-    ncol(ge.chm.p) > 90 ~ list(FALSE, 1)
+    ncol(ge.chm.p) <= 90 ~ list(TRUE, 10 - (ncol(ge.chm.p) - 10) / 10, "black"),
+    ncol(ge.chm.p) > 90 ~ list(FALSE, 1, "white")
   )
 
   # render complex heatmap
-  chm.sigpan_ge.p = Heatmap(ge.chm.p, name = "Enrichment\n     Score", row_split = split_row, column_split = split_col, col = SPCM.es, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
-                            row_title_rot = 0,
-                            row_names_rot = 0,
-                            row_title_gp = gpar(fontsize = 6, fontface = "bold"),
-                            show_row_names = chm_row_names_gp[[1]][1],
-                            row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
-                            row_names_side = "right",
-                            cluster_rows = unsupervisedClustering,
-                            cluster_row_slices = unsupervisedClustering,
-                            cluster_columns = unsupervisedClustering,
-                            cluster_column_slices = unsupervisedClustering,
-                            column_title_rot = 0,
-                            column_title_gp = gpar(fontsize = 12, fontface = "bold"),
-                            column_names_rot = 45,
-                            column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1]),
-                            column_names_side = "bottom",
-                            top_annotation = NULL,
-                            show_heatmap_legend = colorScheme[["mode"]] == "continuous",
-                            heatmap_legend_param = SPCM.es_lgd)
+  if (resizeColSlicer == FALSE) {
+    chm.sigpan_ge.p = Heatmap(ge.chm.p, name = "Enrichment\n     Score", row_split = split_row, column_split = split_col, col = SPCM.es, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                              row_title_rot = 0,
+                              row_names_rot = 0,
+                              row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                              show_row_names = chm_row_names_gp[[1]][1],
+                              row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                              row_names_side = "right",
+                              cluster_rows = unsupervisedClustering,
+                              cluster_row_slices = unsupervisedClustering,
+                              cluster_columns = unsupervisedClustering,
+                              cluster_column_slices = unsupervisedClustering,
+                              column_title_rot = 0,
+                              column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                              column_names_rot = 45,
+                              show_column_names = chm_col_names_gp[[1]][1],
+                              column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                              column_names_side = "bottom",
+                              top_annotation = NULL,
+                              show_heatmap_legend = colorScheme[["mode"]] == "continuous",
+                              heatmap_legend_param = SPCM.es_lgd)
 
-  chm.sigpan_ge.list = chm.sigpan_ge.p
+    chm.sigpan_ge.list = chm.sigpan_ge.p
+  } else {
+    chm.sigpan_ge.p.resize = list()
+    for (i in 1:length(colSliceOrder)) {
+      resizeColSlicer_index = plyr::mapvalues(colnames(ge.chm.p), from = groupInfo$aliasID, to = groupInfo$Group, warn_missing = FALSE) == colSliceOrder[i]
+      chm.sigpan_ge.p.resize[[i]] = Heatmap(ge.chm.p[, resizeColSlicer_index], name = "Enrichment\n     Score", row_split = split_row, column_split = split_col[resizeColSlicer_index], col = SPCM.es, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
+                                            row_title_rot = 0,
+                                            row_names_rot = 0,
+                                            row_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                                            show_row_names = chm_row_names_gp[[1]][1],
+                                            row_names_gp = gpar(fontsize = chm_row_names_gp[[2]][1]),
+                                            row_names_side = "right",
+                                            cluster_rows = unsupervisedClustering,
+                                            cluster_row_slices = unsupervisedClustering,
+                                            cluster_columns = unsupervisedClustering,
+                                            cluster_column_slices = unsupervisedClustering,
+                                            column_title_rot = 0,
+                                            column_title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                            column_names_rot = 45,
+                                            show_column_names = chm_col_names_gp[[1]][1],
+                                            column_names_gp = gpar(fontsize = chm_col_names_gp[[2]][1], col = chm_col_names_gp[[3]][1]),
+                                            column_names_side = "bottom",
+                                            top_annotation = NULL,
+                                            show_heatmap_legend = colorScheme[["mode"]] == "continuous",
+                                            heatmap_legend_param = SPCM.es_lgd,
+                                            width = resizeColSlicer_width[i])
+    }
+    rm(i, resizeColSlicer_index)
+
+    chm.sigpan_ge.list = chm.sigpan_ge.p.resize[[1]]
+    for (i in 2:length(colSliceOrder)) {
+      chm.sigpan_ge.list = chm.sigpan_ge.list + chm.sigpan_ge.p.resize[[i]]
+    }
+    rm(i, chm.sigpan_ge.p.resize)
+  }
 
   if (significanceTest == TRUE) {
     chm.sigpan_ge.pval = Heatmap(ge.chm.p.pval, name = ifelse(length(grpName_pval) > 2, "Anova Test\n   p-value", "    t-test\n   p-value"), row_split = split_row, column_split = NULL, col = SPCM.pval, show_parent_dend_line = FALSE, row_gap = unit(0.25, "mm"), column_gap = unit(1, "mm"), border = TRUE,
@@ -791,8 +828,8 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
   }
 
   # set file name suffix
-  chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm), !is.null(colorScheme[["mode"]])) # always put "filterOutlier" at last, for function complete return message
-  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm), paste0("_", colorScheme[["mode"]]))
+  chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, resizeColSlicer, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm), !is.null(colorScheme[["mode"]])) # always put "filterOutlier" at last, for function complete return message
+  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_Resized", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm), paste0("_", colorScheme[["mode"]]))
   chm_suffix = ""
   for (i in 1:length(chm_moduleStatus)) {
     if (chm_moduleStatus[i] == TRUE) {
@@ -812,19 +849,39 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
 
   # save complex heatmap file and output matrix file
   png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_all.png"), width = 3339, height = 2160, units = "px", res = 300)
-  draw(chm.sigpan_ge.list, auto_adjust = FALSE, heatmap_legend_side = "right", heatmap_legend_list = SPCM.es_lgd_discrete)
-  if (any(significanceTest, calculateFC)) {
-    output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[1]]))
-    output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[1]]))
-    output_ge_mat = chm.sigpan_ge.list@ht_list[[1]]@matrix
+  draw(chm.sigpan_ge.list, auto_adjust = resizeColSlicer, heatmap_legend_side = "right", heatmap_legend_list = SPCM.es_lgd_discrete)
+  if (resizeColSlicer == FALSE) {
+    if (any(significanceTest, calculateFC)) {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[1]]))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[1]]))
+      output_ge_mat = chm.sigpan_ge.list@ht_list[[1]]@matrix
+    } else {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list))
+      output_ge_mat = chm.sigpan_ge.list@matrix
+    }
+    output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+    rm(output_row_order, output_col_order)
   } else {
-    output_row_order = unlist(row_order(chm.sigpan_ge.list))
-    output_col_order = unlist(column_order(chm.sigpan_ge.list))
-    output_ge_mat = chm.sigpan_ge.list@matrix
+    output_ge_mat.resize = list()
+    for (i in 1:(length(colSliceOrder))) {
+      output_row_order = unlist(row_order(chm.sigpan_ge.list@ht_list[[i]]))
+      output_col_order = unlist(column_order(chm.sigpan_ge.list@ht_list[[i]]))
+      output_ge_mat = chm.sigpan_ge.list@ht_list[[i]]@matrix
+      output_ge_mat = output_ge_mat[output_row_order, output_col_order]
+      output_ge_mat.resize[[i]] = output_ge_mat
+    }
+    rm(i, output_row_order, output_col_order, output_ge_mat)
+    output_ge_mat.resize = lapply(output_ge_mat.resize, function(x) {
+      x = as.data.frame(x)
+      return(x)
+    })
+    output_ge_mat = dplyr::bind_cols(output_ge_mat.resize)
+    rownames(output_ge_mat) = rownames(output_ge_mat.resize[[1]])
+    rm(output_ge_mat.resize)
   }
-  output_ge_mat = output_ge_mat[output_row_order, output_col_order]
   write.csv(output_ge_mat, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_all.csv"), quote = FALSE)
-  rm(output_row_order, output_col_order, output_ge_mat)
+  rm(output_ge_mat)
   if (significanceTest_fdrq == TRUE) {
     for (i in 1:length(rowSliceOrder)) {
       decorate_annotation("NgLog10_FDR", {
@@ -844,13 +901,33 @@ v_chmXcell = function(outputFolderPath = "./_VK/_xCell/", ge.xcell.result = ge.x
   if (significanceTest == TRUE) {
     tryCatch({
       png(filename = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_sigOnly.png"), width = 3339, height = 2160, units = "px", res = 300)
-      draw(chm.sigpan_ge.list.sig, auto_adjust = FALSE, heatmap_legend_side = "right")
-      output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
-      output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
-      output_ge_mat.sig = chm.sigpan_ge.list.sig@ht_list[[1]]@matrix
-      output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+      draw(chm.sigpan_ge.list.sig, auto_adjust = resizeColSlicer, heatmap_legend_side = "right", heatmap_legend_list = SPCM.es_lgd_discrete)
+      if (resizeColSlicer == FALSE) {
+        output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
+        output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig@ht_list[[1]]))
+        output_ge_mat.sig = chm.sigpan_ge.list.sig@ht_list[[1]]@matrix
+        output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+        rm(output_row_order.sig, output_col_order.sig)
+      } else {
+        output_ge_mat.resize.sig = list()
+        for (i in 1:(length(colSliceOrder))) {
+          output_row_order.sig = unlist(row_order(chm.sigpan_ge.list.sig@ht_list[[i]]))
+          output_col_order.sig = unlist(column_order(chm.sigpan_ge.list.sig@ht_list[[i]]))
+          output_ge_mat.sig = chm.sigpan_ge.list.sig@ht_list[[i]]@matrix
+          output_ge_mat.sig = output_ge_mat.sig[output_row_order.sig, output_col_order.sig]
+          output_ge_mat.resize.sig[[i]] = output_ge_mat.sig
+        }
+        rm(i, output_row_order.sig, output_col_order.sig, output_ge_mat.sig)
+        output_ge_mat.resize.sig = lapply(output_ge_mat.resize.sig, function(x) {
+          x = as.data.frame(x)
+          return(x)
+        })
+        output_ge_mat.sig = dplyr::bind_cols(output_ge_mat.resize.sig)
+        rownames(output_ge_mat.sig) = rownames(output_ge_mat.resize.sig[[1]])
+        rm(output_ge_mat.resize.sig)
+      }
       write.csv(output_ge_mat.sig, file = paste0(outputFolderPath, "HeatMap4K_", studyID, "_CellTypeEnrichmentScore", chm_suffix, "_sigOnly.csv"), quote = FALSE)
-      rm(output_row_order.sig, output_col_order.sig, output_ge_mat.sig)
+      rm(output_ge_mat.sig)
       if (significanceTest_fdrq == TRUE) {
         if (calculateFC == TRUE) {
           rowSliceOrder_sig = unique(plyr::mapvalues(rownames(ge.chm.p.fdrq.nglog10.sig), from = xcell.foldchange$Cell_Type, to = xcell.foldchange$Exp_Level, warn_missing = FALSE))

@@ -23,7 +23,9 @@ v_chmXcell(
   grpName_pval = grpName,
   addBpAnno = FALSE,
   unsupervisedClustering = FALSE,
-  colorScheme = list(mode = "continuous", breakpoints = seq(0, 1, 0.2))
+  colorScheme = list(mode = "continuous", breakpoints = seq(0, 1, 0.2)),
+  resizeColSlicer = FALSE,
+  resizeColSlicer_width = NULL
 )
 }
 \arguments{
@@ -64,6 +66,10 @@ v_chmXcell(
 \item{unsupervisedClustering}{logic, whether to perform unsupervised clustering (currently support Euclidean distance method), if TRUE, will override "rowSliceOrder" and "colSliceOrder", as well as disable "addBpAnno".}
 
 \item{colorScheme}{list(character, numeric vector), set color scheme for heatmap mainbody, [[1]] mode, choose one from c("continuous", "discrete"); [[2]] breakpoints, should be a numeric vector containing breakpoints ranging from 0 to 1, inclusive; moreover, breakpoints are only used in "discrete" mode, and will be ignored in "continuous" mode. Recommended values are list(mode = "continuous", breakpoints = NULL) and list(mode = "discrete", breakpoints = seq(from = 0, to = 1, by = 0.2)). By default, will use the first recommended value, list(mode = "continuous", breakpoints = NULL).}
+
+\item{resizeColSlicer}{logic, whether to resize each column slicer shown on the heatmap, very useful when number of samples in different groups vary greatly (e.g. 10 samples in group A, 50 in group B, and 300 in group C). By default, size of each column slicer is proportional to its sample size, and thus user can use 'resizeColSlicer' to custom and balance the layout of all column slicers.}
+
+\item{resizeColSlicer_width}{integer vector, should be the same length as the number of column slicers (including additional statistical analysis results columns), and values provided here will be used in relative instead of absolute calculation. For example, there are 3 groups (A/B/C) with 10/50/300 samples in them, respectively. If there are 2 additional statistical analysis results columns, the final column slicers will be 5. Set 'resizeColSlicer_width' to rep(1, 5) will make all of the 5 column slicers the same size, but usually user may want the mainbody to be larger while the sidebar smaller, in this case, 'resizeColSlicer_width' can be set to c(rep(6, 3), rep(1, 2)) so that the 3 groups of the mainbody are in the same size while the additional statistical analysis results are only one-third of the mainbody's size.}
 }
 \value{
 NULL, when a valid outputFolderPath is provided, analysis results and output plots will be generated and saved in the provided location, otherwise function run will stop and nothing will be written into the file system.

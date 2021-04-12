@@ -154,7 +154,7 @@ v_prepareVdata_xCell = function(doGE = FALSE, doLocalAnalysis = FALSE, colSliceO
     colnames(ge.xcell) = c("Gene", plyr::mapvalues(names(ge.list.c), from = groupInfo$assayID, to = groupInfo$aliasID, warn_missing = FALSE))
 
     # calculate average GE for duplicated genes
-    ge.xcell = ge.xcell %>% dplyr::group_by(Gene) %>% dplyr::summarise_all(.vars = colnames(ge.xcell)[-1], .fun = mean) # non-unique colnames error doesn't have an effect
+    ge.xcell = ge.xcell %>% dplyr::group_by(Gene) %>% dplyr::summarise_all(.vars = colnames(ge.xcell)[-1], .fun = mean) # non-unique colnames error doesn't have an effect; also run may get stuck here, use manual stop to generate normal results
     print("GE data processing completed")
   }
 

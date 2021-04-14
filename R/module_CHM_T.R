@@ -663,22 +663,28 @@ v_chmTranscript = function(outputFolderPath = "./_VK/_CHM/", te.list.c = te.list
     # reset column order based on groupInfo$aliasID, also affect EvAnno
     te.chm.p.log10 = te.chm.p.log10[, sort(colnames(te.chm.p.log10))]
     if (addEvAnno == TRUE) {
+      tempColnames = rownames(te.chm.p.ev)
       te.chm.p.ev = te.chm.p.ev[, sort(colnames(te.chm.p.ev))]
       if (is.matrix(te.chm.p.ev) == TRUE) {
         te.chm.p.ev = t(te.chm.p.ev)
         te.chm.p.ev = te.chm.p.ev[, ncol(te.chm.p.ev):1, drop = FALSE]
       } else {
         te.chm.p.ev = as.matrix(te.chm.p.ev)
+        colnames(te.chm.p.ev) = tempColnames
       }
+      rm(tempColnames)
       if (significanceTest == TRUE & nrow(te.chm.p.log10.sig) > 0) {
         te.chm.p.log10.sig = te.chm.p.log10.sig[, sort(colnames(te.chm.p.log10.sig))]
+        tempColnames.sig = rownames(te.chm.p.ev.sig)
         te.chm.p.ev.sig = te.chm.p.ev.sig[, sort(colnames(te.chm.p.ev.sig))]
         if (is.matrix(te.chm.p.ev.sig) == TRUE) {
           te.chm.p.ev.sig = t(te.chm.p.ev.sig)
           te.chm.p.ev.sig = te.chm.p.ev.sig[, ncol(te.chm.p.ev.sig):1, drop = FALSE]
         } else {
           te.chm.p.ev.sig = as.matrix(te.chm.p.ev.sig)
+          colnames(te.chm.p.ev.sig) = tempColnames.sig
         }
+        rm(tempColnames.sig)
       }
     }
 

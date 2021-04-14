@@ -701,6 +701,7 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
 #' @param outputFolderPath string, relative or absolute path to the output folder, trailing slash "/" required, can be set to NULL (no output file will be written to the file system), default "./_VK/_Circos/" for module Circos.
 #' @param startNum integer, by default, vigilante will go through every individual sample and sample group, generating a Circos plot per each item in the list. If an integer is specified, vigilante will instead start generating Circos plots at the specified index (e.g. there 10 samples and 2 groups in the list, set startNum to 11 will make vigilante start generating Circos plots at the first group). If set to NULL, vigilante will automatically detect Circos pltos already existing in the output folder and continue at the most recent generated one (e.g. there are 12 Circos plots in total to be generated and 6 of them already exist in the output folder, to make sure all plots are fully-rendered, vigilante will continue at the 6th plot and overwrite it). Since generating comprehensive Circos plots is very computational-intensive, it is possible that function runs get interrupted and half-rendered plots get generated because of running out of memory. Therefore, it is recommended to set startNum to NULL so that vigilante can ensure every item in the list to be plotted get fully-rendered.
 #' @param endNum integer, by default, vigilante will go through every individual sample and sample group, generating a Circos plot per each item in the list. If an integer is specified, vigilante will instead stop generating Circos plots at the specified index (e.g. there 10 samples and 2 groups in the list, set endNum to 6 will make the 6th sample as the last one to be plotted, and there will be no Circos plots for items after the 6th sample).
+#' @param customPlotNum integer vector, optional, can be set to NULL; if provided, will override "startNum" and "endNum", and only Circos plots at the specified index will be generated (e.g. there 10 samples and 2 groups in the list, set customPlotNum to c(3, 11) will make only the 3rd sample and the 1st group to be plotted).
 #' @param doBAF logic, whether to show BAF track on Circos plots.
 #' @param doCNA logic, whether to show CNA track on Circos plots.
 #' @param doMB mixed vector, c(FALSE, "somatic", "germline"), whether to show MB track on Circos plots; if TRUE, specify the mutation type, can be either "somatic" or "germline" or both, each type will be shown as a separate track on Circos plots.
@@ -718,7 +719,7 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
 #' @export
 #'
 # v_Circos function
-v_Circos = function(outputFolderPath = "./_VK/_Circos/", startNum = NULL, endNum = NULL, doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "somatic", "germline"), doGE = c(FALSE, "log"), doFL = FALSE) {
+v_Circos = function(outputFolderPath = "./_VK/_Circos/", startNum = NULL, endNum = NULL, customPlotNum = NULL, doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "somatic", "germline"), doGE = c(FALSE, "log"), doFL = FALSE) {
 
   # check if outputFolderPath is set
   if (is.null(outputFolderPath)) {
@@ -780,11 +781,22 @@ v_Circos = function(outputFolderPath = "./_VK/_Circos/", startNum = NULL, endNum
     }
   }
 
+  # set finalPlotNum, override startNum and endNum based on customPlotNum
+  if (!is.null(customPlotNum)) {
+    finalPlotNum = customPlotNum
+  } else {
+    finalPlotNum = startNum:endNum
+  }
+
   # beginning of the loop
-  for (i in startNum:endNum) {
+  for (i in finalPlotNum) {
 
     # progress statement, start, with timestamp
-    print(as.character(glue::glue("Start generating plot {i}, {endNum - i} more in queue, {Sys.time()}")))
+    if (!is.null(customPlotNum)) {
+      print(as.character(glue::glue("Start generating plot {i}, {length(finalPlotNum) - grep(i, finalPlotNum)[1]} more in queue, {Sys.time()}")))
+    } else {
+      print(as.character(glue::glue("Start generating plot {i}, {endNum - i} more in queue, {Sys.time()}")))
+    }
 
     # adjust track.height based on track numbers
     track_height_par = suppressWarnings(min(0.4 / sum(doBAF, doCNA, any(doMB, na.rm = TRUE), any(doGE, na.rm = TRUE), doFL), 0.2))

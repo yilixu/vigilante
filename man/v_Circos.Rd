@@ -8,6 +8,7 @@ v_Circos(
   outputFolderPath = "./_VK/_Circos/",
   startNum = NULL,
   endNum = NULL,
+  customPlotNum = NULL,
   doBAF = FALSE,
   doCNA = FALSE,
   doMB = c(FALSE, "somatic", "germline"),
@@ -21,6 +22,8 @@ v_Circos(
 \item{startNum}{integer, by default, vigilante will go through every individual sample and sample group, generating a Circos plot per each item in the list. If an integer is specified, vigilante will instead start generating Circos plots at the specified index (e.g. there 10 samples and 2 groups in the list, set startNum to 11 will make vigilante start generating Circos plots at the first group). If set to NULL, vigilante will automatically detect Circos pltos already existing in the output folder and continue at the most recent generated one (e.g. there are 12 Circos plots in total to be generated and 6 of them already exist in the output folder, to make sure all plots are fully-rendered, vigilante will continue at the 6th plot and overwrite it). Since generating comprehensive Circos plots is very computational-intensive, it is possible that function runs get interrupted and half-rendered plots get generated because of running out of memory. Therefore, it is recommended to set startNum to NULL so that vigilante can ensure every item in the list to be plotted get fully-rendered.}
 
 \item{endNum}{integer, by default, vigilante will go through every individual sample and sample group, generating a Circos plot per each item in the list. If an integer is specified, vigilante will instead stop generating Circos plots at the specified index (e.g. there 10 samples and 2 groups in the list, set endNum to 6 will make the 6th sample as the last one to be plotted, and there will be no Circos plots for items after the 6th sample).}
+
+\item{customPlotNum}{integer vector, optional, can be set to NULL; if provided, will override "startNum" and "endNum", and only Circos plots at the specified index will be generated (e.g. there 10 samples and 2 groups in the list, set customPlotNum to c(3, 11) will make only the 3rd sample and the 1st group to be plotted).}
 
 \item{doBAF}{logic, whether to show BAF track on Circos plots.}
 

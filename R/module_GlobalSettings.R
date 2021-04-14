@@ -5,7 +5,7 @@
 #' @keywords internal
 
 # v_prepareVdata function
-v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fileNum, fileDNA_mafNum, clinicalFeature) {
+v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fileNum, fileDNA_mafNum, clinicalFeature, addTCLabel) {
 
   # set file name matching patterns
   name_pattern = paste0(studyID_regex, "_[[:digit:]]+_[[:digit:]]+")
@@ -17,7 +17,11 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
   }
   rm(i)
   file_name = unlist(file_name)
-  realID = gsub(glue::glue("^({name_pattern}).+$"), "\\1", file_name)
+  if (addTCLabel == TRUE) {
+    realID = gsub(paste0("(", name_pattern, ")", ".*(_[[:upper:]]{1}[[:digit:]]{1})[[:punct:]]{1}.+$"), "\\1\\2", file_name)
+  } else {
+    realID = gsub(glue::glue("^({name_pattern}).+$"), "\\1", file_name)
+  }
   fileID = realID
 
   # extract assayID, set realID, aliasID and sampleNum, generate default groupInfo
@@ -363,6 +367,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #' @param clinicalFeature logical, whether input data have associated clinical information (e.g. Gleason score, Race, Ethnicity). If TRUE, addtional columns for specifying clinical information will be added to the vigilante-generated groupInfo.csv file and user needs to fill them before downstream analyses can properly take these clinical information into consideration.
 #' @param createOutputFolders logical, whether to allow vigilante create specific output folders as the default place for storing downstream analyses output files (e.g. plots, results tables). If TRUE, a set of output folders will be created in the working directory under ./_VK/. It is recommended to set it to TRUE so that downstream analyses output files can be better organized inside "_VK" folder; if FALSE, user needs to specify a output path each time user chooses to generate a output file.
 #' @param prepareVdata logical, whether to allow vigilante prepare all input data files in the working directory. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc. If TRUE, user will be asked to backup input data files before continuing; if FALSE, vigilante will stop the run and no input data files will be affected.
+#' @param addTCLabel logical, whether to add TC (Tumor/Control) label into consideration when capture and rename the input data files, see Details for more information.
 #'
 #' @details
 #' The workflow of vigilante is highly module-based. Modules are connected and there are certain settings that are shared across all modules. To ensure a successful and smooth run, these settings need to be properly specified by the user.
@@ -377,6 +382,8 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #'
 #' In the second demo example below, "studyID" is set to "KPROCOMBI" (K - certain prefix, PRO - prostate cancer, COMBI - combined study). Because sub-studies of "KPROCOMBI" are named such as "KGARUSCAG", "KPINSKIJC", "KRPLUSCJC" etc., here "studyID_regex" is set to "[[:upper:]]{9}" to properly capture them all.
 #'
+#' Here is more information about "addTCLabel". Unlike in the first demo example, in the second demo example below, there are suffixes like "C1", "T1" or "T2" in the file name where sample IDs are the same. In order to correctly capture and differentiate different sections/parts of the same sample, "addTCLabel" needs to be set to TRUE.
+#'
 #' Another very important thing about vigilante is the "groupInfo.csv" file. This file contains the meta-info required by downstream analyses. By default, "groupInfo.csv" has five columns: "assayID", "Group", "MAF_group", "realID" and "aliasID." If "clinicalFeature" is set to TRUE, there can be more columns. Usually, user should leave "assayID", "MAF_group" and "realID" unchanged as they are auto-populated by vigilante and already in the right format. The "aliasID" column can be changed if user wants to set specific names for their samples, and this change can only be made after the first run or when input files are already moved into position, otherwise should be left unchanged as well. The "Group" column (and possible additional "CliFea" columns) is where user should properly fill in.
 #'
 #' For example, if samples are divided into training, validation and testing groups, the "Group" column should be filled with "Training", "Validation" and "Testing" accordingly. Similarly, if additional clinical information are available, user can specify them in the "CliFea" columns. Here "CliFea" is only a placeholder name, and user should change the column name to reflect that clinical feature (e.g. change it to "Race" column and fill in race information like "White", "Black or African American", "Asian" etc.; "Gleason Score" and fill in Gleason score values). Also, "CliFea" columns are not limited to two. User can add more columns to the right following the above instruction.
@@ -389,13 +396,13 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #' globalSettings_returnList = v_globalSettings(studyID = "KSCWUSCRF",
 #' studyID_regex = "[[:upper:]]{9}", studyID_altered = FALSE, speciesID =
 #' "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
-#' createOutputFolders = TRUE, prepareVdata = TRUE)
+#' createOutputFolders = TRUE, prepareVdata = TRUE, addTCLabel = FALSE)
 #'
 #' # combined study of prostate cancer
 #' globalSettings_returnList = v_globalSettings(studyID = "KPROCOMBI",
 #' studyID_regex = "[[:upper:]]{9}", studyID_altered = TRUE, speciesID =
 #' "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
-#' createOutputFolders = TRUE, prepareVdata = TRUE)
+#' createOutputFolders = TRUE, prepareVdata = TRUE, addTCLabel = TRUE)
 #' }
 #'
 #' @import utils
@@ -403,7 +410,7 @@ v_prepareVdata = function(studyID, studyID_regex, studyID_altered, speciesID, fi
 #' @export
 #'
 # v_globalSettings function
-v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE, createOutputFolders = FALSE, prepareVdata = FALSE) {
+v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, speciesID = "hg38", fileNum, fileDNA_mafNum, clinicalFeature = FALSE, createOutputFolders = FALSE, prepareVdata = FALSE, addTCLabel = FALSE) {
 
   # ask user to make sure "vigilante.knights.sword" package is already installed
   status_sword = menu(choices = c("Yes", "No"), title = "\nDue to the requirement of CRAN that general packages should not exceed 5MB, the supplemental workbook or reference datasets (sword) required by vigilante & knights have been extracted and put in the standalone package vigilante.knights.sword. Please check https://github.com/yilixu/vigilante.knights.sword for more information. vigilante & knights will need 'sword' to perform downstream analysis. Is 'vigilante.knights.sword' package already installed?")
@@ -499,7 +506,7 @@ v_globalSettings = function(studyID, studyID_regex, studyID_altered = FALSE, spe
 
   # prepare data files for VIGILANTE format
   if (prepareVdata == TRUE) {
-    prepareVdata_returnList = v_prepareVdata(studyID, studyID_regex, studyID_altered, speciesID, fileNum, fileDNA_mafNum, clinicalFeature)
+    prepareVdata_returnList = v_prepareVdata(studyID, studyID_regex, studyID_altered, speciesID, fileNum, fileDNA_mafNum, clinicalFeature, addTCLabel)
   } else {
     print("In order to properly perform downstream analyses, vigilante needs to prepare all input data files in the working directory before continuing. Please set prepareVdata to TRUE and run the function again")
     stop()

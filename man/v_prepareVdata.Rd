@@ -11,7 +11,8 @@ v_prepareVdata(
   speciesID,
   fileNum,
   fileDNA_mafNum,
-  clinicalFeature
+  clinicalFeature,
+  addTCLabel
 )
 }
 \description{

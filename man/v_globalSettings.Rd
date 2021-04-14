@@ -13,7 +13,8 @@ v_globalSettings(
   fileDNA_mafNum,
   clinicalFeature = FALSE,
   createOutputFolders = FALSE,
-  prepareVdata = FALSE
+  prepareVdata = FALSE,
+  addTCLabel = FALSE
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ v_globalSettings(
 \item{createOutputFolders}{logical, whether to allow vigilante create specific output folders as the default place for storing downstream analyses output files (e.g. plots, results tables). If TRUE, a set of output folders will be created in the working directory under ./_VK/. It is recommended to set it to TRUE so that downstream analyses output files can be better organized inside "_VK" folder; if FALSE, user needs to specify a output path each time user chooses to generate a output file.}
 
 \item{prepareVdata}{logical, whether to allow vigilante prepare all input data files in the working directory. This internal process includes several steps such as renaming data files, setting group-related parameters, setting ENSEMBL refernece, etc. If TRUE, user will be asked to backup input data files before continuing; if FALSE, vigilante will stop the run and no input data files will be affected.}
+
+\item{addTCLabel}{logical, whether to add TC (Tumor/Control) label into consideration when capture and rename the input data files, see Details for more information.}
 }
 \value{
 list, because R CMD check discourages assignments to the global environment within functions, user needs to run the function with explicitly assigning the return value to a global variable named "globalSettings_returnList", which will be a list containing the required variables for downstream analyses.
@@ -52,6 +55,8 @@ Sometimes the working study isn't a single study but a combined study, and conta
 
 In the second demo example below, "studyID" is set to "KPROCOMBI" (K - certain prefix, PRO - prostate cancer, COMBI - combined study). Because sub-studies of "KPROCOMBI" are named such as "KGARUSCAG", "KPINSKIJC", "KRPLUSCJC" etc., here "studyID_regex" is set to "[[:upper:]]{9}" to properly capture them all.
 
+Here is more information about "addTCLabel". Unlike in the first demo example, in the second demo example below, there are suffixes like "C1", "T1" or "T2" in the file name where sample IDs are the same. In order to correctly capture and differentiate different sections/parts of the same sample, "addTCLabel" needs to be set to TRUE.
+
 Another very important thing about vigilante is the "groupInfo.csv" file. This file contains the meta-info required by downstream analyses. By default, "groupInfo.csv" has five columns: "assayID", "Group", "MAF_group", "realID" and "aliasID." If "clinicalFeature" is set to TRUE, there can be more columns. Usually, user should leave "assayID", "MAF_group" and "realID" unchanged as they are auto-populated by vigilante and already in the right format. The "aliasID" column can be changed if user wants to set specific names for their samples, and this change can only be made after the first run or when input files are already moved into position, otherwise should be left unchanged as well. The "Group" column (and possible additional "CliFea" columns) is where user should properly fill in.
 
 For example, if samples are divided into training, validation and testing groups, the "Group" column should be filled with "Training", "Validation" and "Testing" accordingly. Similarly, if additional clinical information are available, user can specify them in the "CliFea" columns. Here "CliFea" is only a placeholder name, and user should change the column name to reflect that clinical feature (e.g. change it to "Race" column and fill in race information like "White", "Black or African American", "Asian" etc.; "Gleason Score" and fill in Gleason score values). Also, "CliFea" columns are not limited to two. User can add more columns to the right following the above instruction.
@@ -62,13 +67,13 @@ For example, if samples are divided into training, validation and testing groups
 globalSettings_returnList = v_globalSettings(studyID = "KSCWUSCRF",
 studyID_regex = "[[:upper:]]{9}", studyID_altered = FALSE, speciesID =
 "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
-createOutputFolders = TRUE, prepareVdata = TRUE)
+createOutputFolders = TRUE, prepareVdata = TRUE, addTCLabel = FALSE)
 
 # combined study of prostate cancer
 globalSettings_returnList = v_globalSettings(studyID = "KPROCOMBI",
 studyID_regex = "[[:upper:]]{9}", studyID_altered = TRUE, speciesID =
 "hg19", fileNum = 7, fileDNA_mafNum = 2, clinicalFeature = TRUE,
-createOutputFolders = TRUE, prepareVdata = TRUE)
+createOutputFolders = TRUE, prepareVdata = TRUE, addTCLabel = TRUE)
 }
 
 }

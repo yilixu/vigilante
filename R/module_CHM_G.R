@@ -1272,7 +1272,7 @@ v_chmSignaturePanel = function(outputFolderPath = "./_VK/_CHM/", ge.list = ge.li
 
   # set file name suffix
   chm_moduleStatus = c(significanceTest, significanceTest_fdrq, calculateFC, resizeColSlicer, TPM2RHKG, calculateRS, filterOutlier, unsupervisedClustering, addBpAnno, !is.null(significanceTest_inputForm)) # always put "calculateRS" and "filterOutlier" at last, for function complete return message
-  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", "_Resized", "_RHKG", "_RiskScore", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm))
+  names(chm_moduleStatus) = c("_pvalue", "_fdrq", "_FoldChange", paste0("_Resized_glsbl", gridLineStart_baseline), "_RHKG", "_RiskScore", "_Filtered", "_Unsupervised", "_BpAnno", paste0("_", significanceTest_inputForm))
   chm_suffix = ""
   for (i in 1:length(chm_moduleStatus)) {
     if (chm_moduleStatus[i] == TRUE) {

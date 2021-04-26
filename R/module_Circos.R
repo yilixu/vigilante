@@ -639,17 +639,16 @@ v_prepareVdata_Circos = function(doBAF = FALSE, doCNA = FALSE, doMB = c(FALSE, "
       }
       x = plyr::arrange(x, Chr, Start, End)
       x = unique(x)
-      x = as.character(unlist(x[, 5]))
     })
 
-    # factorize and arrange lb.list.c to make sure match the order of lb_intraORinter.list.c
-    lb.list.c = lapply(lb.list.c, function(x) {
-      if (speciesID %in% c("hg38", "hg19")) {
-        x[, 1] = factor(x[, 1], levels = paste0("chr", c(1:22, "X", "Y")))
-      } else if (speciesID %in% c("mm10", "mm9")) {
-        x[, 1] = factor(x[, 1], levels = paste0("chr", c(1:19, "X", "Y")))
-      }
-      x = plyr::arrange(x, Chr, Start, End)
+    # extract lb.list.c from lb_intraORinter.list.c and reset lb_intraORinter.list.c to make sure they match each other
+    lb.list.c = lapply(lb_intraORinter.list.c, function(x) {
+      x = subset(x, select = 1:4)
+      return(x)
+    })
+    lb_intraORinter.list.c = lapply(lb_intraORinter.list.c, function(x) {
+      x = as.character(unlist(x[, 5]))
+      return(x)
     })
 
     # remove temp fl data
